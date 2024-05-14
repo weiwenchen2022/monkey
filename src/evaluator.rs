@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 use std::cmp::Ordering;
 use std::collections::HashMap;
 

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::{
     ast::{self, Expression, Node, Program, Statement},
     environment::Environment,

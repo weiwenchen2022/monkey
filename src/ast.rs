@@ -11,6 +11,24 @@ pub enum Node {
     Expression(Expression),
 }
 
+impl From<Program> for Node {
+    fn from(program: Program) -> Self {
+        Node::Program(program)
+    }
+}
+
+impl From<Statement> for Node {
+    fn from(statement: Statement) -> Self {
+        Node::Statement(statement)
+    }
+}
+
+impl From<Expression> for Node {
+    fn from(expression: Expression) -> Self {
+        Node::Expression(expression)
+    }
+}
+
 impl Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
