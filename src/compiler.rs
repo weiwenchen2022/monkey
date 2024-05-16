@@ -4,14 +4,33 @@ use crate::{
     object::Object,
 };
 
+use std::mem;
+
 pub struct Bytecode {
     pub(crate) instructions: Instructions,
     pub(crate) constants: Vec<Object>,
 }
 
+struct EmittedInstruction {
+    opcode: Opcode,
+    position: usize,
+}
+
+impl Default for EmittedInstruction {
+    fn default() -> Self {
+        Self {
+            opcode: Opcode::Null,
+            position: 0,
+        }
+    }
+}
+
 pub struct Compiler {
     instructions: Instructions,
     constants: Vec<Object>,
+
+    last_instruction: EmittedInstruction,
+    previous_instruction: EmittedInstruction,
 }
 
 impl Compiler {
@@ -19,6 +38,9 @@ impl Compiler {
         Self {
             instructions: Instructions::default(),
             constants: Vec::new(),
+
+            last_instruction: EmittedInstruction::default(),
+            previous_instruction: EmittedInstruction::default(),
         }
     }
 
@@ -83,6 +105,49 @@ impl Compiler {
                 };
             }
 
+            Node::Expression(Expression::If {
+                condition,
+                consequence,
+                alternative,
+                ..
+            }) => {
+                self.compile(*condition)?;
+
+                // Emit an `OpJumpNotTruthy` with a bogus value
+                let jump_not_truthy_pos = self.emit(Opcode::JumpNotTruthy, &[i16::MAX as i64]);
+
+                self.compile(*consequence)?;
+
+                if self.last_instruction_is_pop() {
+                    self.remove_last_pop();
+                }
+
+                // Emit an `OpJump` with a bogus value
+                let jump_pos = self.emit(Opcode::Jump, &[i16::MAX as i64]);
+
+                let after_consequence_pos = self.instructions.len();
+                self.change_operand(jump_not_truthy_pos, after_consequence_pos as i64);
+
+                if alternative.is_none() {
+                    self.emit(Opcode::Null, &[]);
+                } else {
+                    self.compile(*alternative.unwrap())?;
+
+                    if self.last_instruction_is_pop() {
+                        self.remove_last_pop();
+                    }
+                }
+
+                let after_alternative_pos = self.instructions.len();
+                self.change_operand(jump_pos, after_alternative_pos as i64);
+            }
+
+            Node::Statement(Statement::Block { statements, .. }) => {
+                for s in statements {
+                    self.compile(s)?;
+                }
+            }
+
             _ => (),
         }
 
@@ -103,7 +168,39 @@ impl Compiler {
 
     fn emit(&mut self, op: Opcode, operands: &[i64]) -> usize {
         let ins = code::make(op, operands);
-        self.add_instruction(ins)
+        let pos = self.add_instruction(ins);
+        self.set_last_instruction(op, pos);
+
+        pos
+    }
+
+    fn last_instruction_is_pop(&self) -> bool {
+        matches!(self.last_instruction, EmittedInstruction { opcode , .. } if  Opcode::Pop == opcode)
+    }
+
+    fn remove_last_pop(&mut self) {
+        self.instructions.truncate(self.last_instruction.position);
+        self.last_instruction = mem::take(&mut self.previous_instruction);
+    }
+
+    fn replace_instruction(&mut self, pos: usize, new_instruction: Vec<u8>) {
+        self.instructions[pos..pos + new_instruction.len()].copy_from_slice(&new_instruction);
+    }
+
+    fn change_operand(&mut self, op_pos: usize, operand: i64) {
+        let op = self.instructions[op_pos].try_into().unwrap();
+        let new_instruction = make!(op, operand);
+        self.replace_instruction(op_pos, new_instruction.into());
+    }
+
+    fn set_last_instruction(&mut self, op: Opcode, pos: usize) {
+        self.previous_instruction = mem::replace(
+            &mut self.last_instruction,
+            EmittedInstruction {
+                opcode: op,
+                position: pos,
+            },
+        );
     }
 
     fn add_instruction(&mut self, ins: Instructions) -> usize {

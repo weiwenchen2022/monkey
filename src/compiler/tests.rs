@@ -18,6 +18,22 @@ struct CompilerTestCase<'a> {
     expected_instructions: Vec<Instructions>,
 }
 
+macro_rules! run_compiler_tests {
+    ($tests:tt) => {
+        for tt in $tests {
+            let program = parse(tt.input);
+
+            let mut compiler = Compiler::new();
+            compiler.compile(program).expect("compiler error: ");
+
+            let bytecode = compiler.bytecode();
+
+            test_instructions(&tt.expected_instructions, &bytecode.instructions);
+            test_constants(&tt.expected_constants, &bytecode.constants);
+        }
+    };
+}
+
 #[test]
 fn integer_arithmetic() {
     let tests: &[CompilerTestCase] = &[
@@ -82,7 +98,7 @@ fn integer_arithmetic() {
         },
     ];
 
-    run_compiler_tests(tests);
+    run_compiler_tests!(tests);
 }
 
 #[test]
@@ -169,21 +185,63 @@ fn boolean_expression() {
         },
     ];
 
-    run_compiler_tests(tests);
+    run_compiler_tests!(tests);
 }
 
-fn run_compiler_tests(tests: &[CompilerTestCase]) {
-    for tt in tests {
-        let program = parse(tt.input);
+#[test]
+fn conditionals() {
+    let tests = &[
+        CompilerTestCase {
+            input: "
+			if (true) { 10 }; 3333;
+			",
+            expected_constants: vec![Box::new(10), Box::new(3333)],
+            expected_instructions: vec![
+                // 0000
+                make!(Opcode::True),
+                // 0001
+                make!(Opcode::JumpNotTruthy, 10),
+                // 0004
+                make!(Opcode::Constant, 0),
+                // 0007
+                make!(Opcode::Jump, 11),
+                // 0010
+                make!(Opcode::Null),
+                // 0011
+                make!(Opcode::Pop),
+                // 0012
+                make!(Opcode::Constant, 1),
+                // 0015
+                make!(Opcode::Pop),
+            ],
+        },
+        CompilerTestCase {
+            input: "
+			if (true) { 10 } else { 20 }; 3333;
+			",
+            expected_constants: vec![Box::new(10), Box::new(20), Box::new(3333)],
+            expected_instructions: vec![
+                // 0000
+                make!(Opcode::True),
+                // 0001
+                make!(Opcode::JumpNotTruthy, 10),
+                // 0004
+                make!(Opcode::Constant, 0),
+                // 0007
+                make!(Opcode::Jump, 13),
+                // 0010
+                make!(Opcode::Constant, 1),
+                // 0013
+                make!(Opcode::Pop),
+                // 0014
+                make!(Opcode::Constant, 2),
+                // 0017
+                make!(Opcode::Pop),
+            ],
+        },
+    ];
 
-        let mut compiler = Compiler::new();
-        compiler.compile(program).expect("compiler error: ");
-
-        let bytecode = compiler.bytecode();
-
-        test_instructions(&tt.expected_instructions, &bytecode.instructions);
-        test_constants(&tt.expected_constants, &bytecode.constants);
-    }
+    run_compiler_tests!(tests)
 }
 
 fn parse(input: &str) -> Program {

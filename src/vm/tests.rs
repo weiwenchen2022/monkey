@@ -13,6 +13,23 @@ struct VmTestCase<'a> {
     expected: Box<dyn Any>,
 }
 
+macro_rules! run_vm_tests {
+    ($tests:tt) => {
+        for tt in $tests {
+            let program = parse(tt.input);
+
+            let mut comp = Compiler::new();
+            comp.compile(program).expect("compiler error: ");
+
+            let mut vm = VM::new(comp.bytecode());
+            vm.run().expect("vm error: ");
+
+            let stack_elem = vm.last_popped_stack_elem();
+            test_expected_object(&tt.expected, &stack_elem)
+        }
+    };
+}
+
 #[test]
 fn integer_arithmetic() {
     let tests = &[
@@ -86,7 +103,7 @@ fn integer_arithmetic() {
         },
     ];
 
-    run_vm_tests(tests);
+    run_vm_tests!(tests);
 }
 
 #[test]
@@ -192,24 +209,61 @@ fn boolean_expression() {
             input: "!!5",
             expected: Box::new(true),
         },
+        VmTestCase {
+            input: "!(if (false) { 5; })",
+            expected: Box::new(true),
+        },
+        VmTestCase {
+            input: "if ((if (false) { 10 })) { 10 } else { 20 }",
+            expected: Box::new(20),
+        },
     ];
 
-    run_vm_tests(tests);
+    run_vm_tests!(tests);
 }
 
-fn run_vm_tests(tests: &[VmTestCase]) {
-    for tt in tests {
-        let program = parse(tt.input);
+#[test]
+fn conditionals() {
+    let tests = &[
+        VmTestCase {
+            input: "if (true) { 10 }",
+            expected: Box::new(10),
+        },
+        VmTestCase {
+            input: "if (true) { 10 } else { 20 }",
+            expected: Box::new(10),
+        },
+        VmTestCase {
+            input: "if (false) { 10 } else { 20 } ",
+            expected: Box::new(20),
+        },
+        VmTestCase {
+            input: "if (1) { 10 }",
+            expected: Box::new(10),
+        },
+        VmTestCase {
+            input: "if (1 < 2) { 10 }",
+            expected: Box::new(10),
+        },
+        VmTestCase {
+            input: "if (1 < 2) { 10 } else { 20 }",
+            expected: Box::new(10),
+        },
+        VmTestCase {
+            input: "if (1 > 2) { 10 } else { 20 }",
+            expected: Box::new(20),
+        },
+        VmTestCase {
+            input: "if (1 > 2) { 10 }",
+            expected: Box::new(()),
+        },
+        VmTestCase {
+            input: "if (false) { 10 }",
+            expected: Box::new(()),
+        },
+    ];
 
-        let mut comp = Compiler::new();
-        comp.compile(program).expect("compiler error: ");
-
-        let mut vm = VM::new(comp.bytecode());
-        vm.run().expect("vm error: ");
-
-        let stack_elem = vm.last_popped_stack_elem();
-        test_expected_object(&tt.expected, &stack_elem)
-    }
+    run_vm_tests!(tests);
 }
 
 fn parse(input: &str) -> Program {
@@ -223,6 +277,8 @@ fn test_expected_object(expected: &Box<dyn Any>, actual: &Object) {
         test_integer_object(expected as i64, actual)
     } else if let Some(expected) = expected.downcast_ref::<bool>().copied() {
         test_boolean_object(expected, actual);
+    } else if let Some(()) = expected.downcast_ref::<()>() {
+        assert!(matches!(actual, Object::Null));
     } else {
         panic!("type_id {:?}", expected.as_ref().type_id());
     }

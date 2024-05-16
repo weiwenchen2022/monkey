@@ -73,6 +73,25 @@ impl VM {
                 Opcode::Minus => {
                     self.execute_minus_operator()?;
                 }
+
+                Opcode::Jump => {
+                    let pos = code::read_u16(&instructions[ip + 1..]);
+                    ip = pos as usize - 1;
+                }
+                Opcode::JumpNotTruthy => {
+                    let pos = code::read_u16(&instructions[ip + 1..]);
+                    ip += 2;
+
+                    let condition = self.pop();
+                    let is_truthy: bool = condition.into();
+                    if !is_truthy {
+                        ip = pos as usize - 1;
+                    }
+                }
+
+                Opcode::Null => {
+                    self.push(Object::Null)?;
+                }
             }
 
             ip += 1;

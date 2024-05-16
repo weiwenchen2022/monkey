@@ -27,6 +27,12 @@ impl From<Vec<u8>> for Instructions {
     }
 }
 
+impl From<Instructions> for Vec<u8> {
+    fn from(ins: Instructions) -> Self {
+        ins.0
+    }
+}
+
 impl Debug for Instructions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self)
@@ -90,6 +96,11 @@ pub(crate) enum Opcode {
 
     Minus,
     Bang,
+
+    JumpNotTruthy,
+    Jump,
+
+    Null,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -202,6 +213,27 @@ lazy_static! {
                 Opcode::Bang,
                 Definition {
                     name: "OpBang",
+                    operand_widths: &[],
+                },
+            ),
+            (
+                Opcode::JumpNotTruthy,
+                Definition {
+                    name: "OpJumpNotTruthy",
+                    operand_widths: &[2],
+                },
+            ),
+            (
+                Opcode::Jump,
+                Definition {
+                    name: "OpJump",
+                    operand_widths: &[2],
+                },
+            ),
+            (
+                Opcode::Null,
+                Definition {
+                    name: "OpNull",
                     operand_widths: &[],
                 },
             ),
