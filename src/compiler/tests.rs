@@ -244,6 +244,56 @@ fn conditionals() {
     run_compiler_tests!(tests)
 }
 
+#[test]
+fn global_let_statements() {
+    let tests = &[
+        CompilerTestCase {
+            input: "
+			let one = 1;
+			let two = 2;
+			",
+            expected_constants: vec![Box::new(1), Box::new(2)],
+            expected_instructions: vec![
+                make!(Opcode::Constant, 0),
+                make!(Opcode::SetGlobal, 0),
+                make!(Opcode::Constant, 1),
+                make!(Opcode::SetGlobal, 1),
+            ],
+        },
+        CompilerTestCase {
+            input: "
+			let one = 1;
+			one;
+			",
+            expected_constants: vec![Box::new(1)],
+            expected_instructions: vec![
+                make!(Opcode::Constant, 0),
+                make!(Opcode::SetGlobal, 0),
+                make!(Opcode::GetGlobal, 0),
+                make!(Opcode::Pop),
+            ],
+        },
+        CompilerTestCase {
+            input: "
+			let one = 1;
+			let two = one;
+			two;
+			",
+            expected_constants: vec![Box::new(1)],
+            expected_instructions: vec![
+                make!(Opcode::Constant, 0),
+                make!(Opcode::SetGlobal, 0),
+                make!(Opcode::GetGlobal, 0),
+                make!(Opcode::SetGlobal, 1),
+                make!(Opcode::GetGlobal, 1),
+                make!(Opcode::Pop),
+            ],
+        },
+    ];
+
+    run_compiler_tests!(tests);
+}
+
 fn parse(input: &str) -> Program {
     let l = Lexer::new(input.as_bytes());
     let mut p = Parser::new(l);

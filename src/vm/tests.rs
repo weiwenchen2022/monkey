@@ -266,6 +266,25 @@ fn conditionals() {
     run_vm_tests!(tests);
 }
 
+#[test]
+fn global_let_statements() {
+    let tests = &[
+        VmTestCase {
+            input: "let one = 1; one",
+            expected: Box::new(1),
+        },
+        VmTestCase {
+            input: "let one = 1; let two = 2; one + two",
+            expected: Box::new(3),
+        },
+        VmTestCase {
+            input: "let one = 1; let two = one + one; one + two",
+            expected: Box::new(3),
+        },
+    ];
+
+    run_vm_tests!(tests);
+}
 fn parse(input: &str) -> Program {
     let l = Lexer::new(input.as_bytes());
     let mut p = Parser::new(l);

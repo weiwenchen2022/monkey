@@ -7,6 +7,7 @@ use crate::compiler::Bytecode;
 use crate::object::Object;
 
 const STACK_SIZE: usize = 2048;
+pub(crate) const GLOBALS_SIZE: usize = 65536;
 
 type Result<T> = std::result::Result<T, Cow<'static, str>>;
 
@@ -16,9 +17,17 @@ pub struct VM {
 
     stack: Vec<Object>,
     sp: usize, // Always points to the next value. Top of stack is stack[sp-1]
+
+    pub(crate) globals: Vec<Object>,
 }
 
 impl VM {
+    pub fn new_with_global_store(bytecode: Bytecode, s: Vec<Object>) -> Self {
+        let mut vm = Self::new(bytecode);
+        vm.globals = s;
+        vm
+    }
+
     pub fn new(bytecode: Bytecode) -> Self {
         Self {
             constants: bytecode.constants,
@@ -26,6 +35,8 @@ impl VM {
 
             stack: vec![Object::Null; STACK_SIZE],
             sp: 0,
+
+            globals: vec![Object::Null; GLOBALS_SIZE],
         }
     }
 
@@ -91,6 +102,19 @@ impl VM {
 
                 Opcode::Null => {
                     self.push(Object::Null)?;
+                }
+
+                Opcode::SetGlobal => {
+                    let global_index = code::read_u16(&instructions[ip + 1..]);
+                    ip += 2;
+                    self.globals[global_index as usize] = self.pop();
+                }
+
+                Opcode::GetGlobal => {
+                    let global_index = code::read_u16(&instructions[ip + 1..]);
+                    ip += 2;
+
+                    self.push(self.globals[global_index as usize].clone())?;
                 }
             }
 

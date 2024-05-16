@@ -6,6 +6,10 @@ use crate::{
 
 use std::mem;
 
+pub(crate) use self::symbol_table::SymbolTable;
+
+mod symbol_table;
+
 pub struct Bytecode {
     pub(crate) instructions: Instructions,
     pub(crate) constants: Vec<Object>,
@@ -27,13 +31,22 @@ impl Default for EmittedInstruction {
 
 pub struct Compiler {
     instructions: Instructions,
-    constants: Vec<Object>,
+    pub(crate) constants: Vec<Object>,
 
     last_instruction: EmittedInstruction,
     previous_instruction: EmittedInstruction,
+
+    pub(crate) symbol_table: SymbolTable,
 }
 
 impl Compiler {
+    pub fn new_with_state(s: SymbolTable, constants: Vec<Object>) -> Self {
+        let mut compiler = Self::new();
+        compiler.symbol_table = s;
+        compiler.constants = constants;
+        compiler
+    }
+
     pub fn new() -> Self {
         Self {
             instructions: Instructions::default(),
@@ -41,6 +54,8 @@ impl Compiler {
 
             last_instruction: EmittedInstruction::default(),
             previous_instruction: EmittedInstruction::default(),
+
+            symbol_table: SymbolTable::new(),
         }
     }
 
@@ -146,6 +161,25 @@ impl Compiler {
                 for s in statements {
                     self.compile(s)?;
                 }
+            }
+
+            Node::Statement(Statement::Let { name, value, .. }) => {
+                self.compile(value)?;
+
+                let Expression::Identifier { value: name, .. } = name else {
+                    panic!("{name:?}");
+                };
+
+                let symbol = self.symbol_table.define(name);
+                self.emit(Opcode::SetGlobal, &[symbol.index as i64]);
+            }
+
+            Node::Expression(Expression::Identifier { value: name, .. }) => {
+                let Some(symbol) = self.symbol_table.resolve(&name) else {
+                    return Err(format!("undefined variable {name}"));
+                };
+
+                self.emit(Opcode::GetGlobal, &[symbol.index as i64]);
             }
 
             _ => (),

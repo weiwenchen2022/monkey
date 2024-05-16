@@ -1,15 +1,20 @@
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read, Write};
 
-use crate::compiler::Compiler;
+use crate::compiler::{Compiler, SymbolTable};
 use crate::lexer::Lexer;
+use crate::object::Object;
 use crate::parser::Parser;
-use crate::vm::VM;
+use crate::vm::{self, VM};
 
 const PROMT: &str = ">> ";
 
 pub fn start<R: Read, W: Write>(input: R, mut output: W) -> Result<(), Box<dyn Error + 'static>> {
     let mut lines = BufReader::new(input).lines();
+
+    let mut constants = Vec::new();
+    let mut globals = vec![Object::Null; vm::GLOBALS_SIZE];
+    let mut symbol_table = SymbolTable::new();
 
     loop {
         write!(&mut output, "{}", PROMT)?;
@@ -29,14 +34,22 @@ pub fn start<R: Read, W: Write>(input: R, mut output: W) -> Result<(), Box<dyn E
             continue;
         }
 
-        let mut comp = Compiler::new();
+        let mut comp = Compiler::new_with_state(symbol_table, constants);
         if let Err(err) = comp.compile(program) {
+            symbol_table = comp.symbol_table;
+            constants = comp.constants;
+
             writeln!(&mut output, "Woops! Compilation failed:\n {err}")?;
             continue;
         }
 
-        let mut machine = VM::new(comp.bytecode());
+        let code = comp.bytecode();
+        symbol_table = comp.symbol_table;
+        constants = code.constants.clone();
+
+        let mut machine = VM::new_with_global_store(code, globals);
         if let Err(err) = machine.run() {
+            globals = machine.globals;
             writeln!(&mut output, "Woops! Executing bytecode failed:\n {err}")?;
             continue;
         }
@@ -44,6 +57,8 @@ pub fn start<R: Read, W: Write>(input: R, mut output: W) -> Result<(), Box<dyn E
         let last_popped = machine.last_popped_stack_elem();
         write!(&mut output, "{}", last_popped)?;
         writeln!(&mut output)?;
+
+        globals = machine.globals;
     }
 
     Ok(())

@@ -101,6 +101,9 @@ pub(crate) enum Opcode {
     Jump,
 
     Null,
+
+    GetGlobal,
+    SetGlobal,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -235,6 +238,20 @@ lazy_static! {
                 Definition {
                     name: "OpNull",
                     operand_widths: &[],
+                },
+            ),
+            (
+                Opcode::GetGlobal,
+                Definition {
+                    name: "OpGetGlobal",
+                    operand_widths: &[2],
+                },
+            ),
+            (
+                Opcode::SetGlobal,
+                Definition {
+                    name: "OpSetGlobal",
+                    operand_widths: &[2],
                 },
             ),
         ]);
