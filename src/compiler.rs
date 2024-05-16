@@ -33,18 +33,30 @@ impl Compiler {
             }
             Node::Statement(Statement::Expression { expression, .. }) => {
                 self.compile(expression)?;
+                self.emit(Opcode::Pop, &[]);
             }
             Node::Expression(Expression::Infix {
-                left,
-                operator,
-                right,
+                mut left,
+                mut operator,
+                mut right,
                 ..
             }) => {
+                if operator == "<" {
+                    (left, right) = (right, left);
+                    operator = ">".to_string();
+                }
+
                 self.compile(*left)?;
                 self.compile(*right)?;
 
                 match operator.as_str() {
                     "+" => self.emit(Opcode::Add, &[]),
+                    "-" => self.emit(Opcode::Sub, &[]),
+                    "*" => self.emit(Opcode::Mul, &[]),
+                    "/" => self.emit(Opcode::Div, &[]),
+                    ">" => self.emit(Opcode::GreaterThan, &[]),
+                    "==" => self.emit(Opcode::Equal, &[]),
+                    "!=" => self.emit(Opcode::NotEqual, &[]),
                     _ => return Err(format!("unknown operator {operator}")),
                 };
             }
@@ -55,7 +67,23 @@ impl Compiler {
                 self.emit(Opcode::Constant, &[const_index as i64]);
             }
 
-            _ => panic!("{node}"),
+            Node::Expression(Expression::Boolean { value, .. }) => {
+                self.emit(if value { Opcode::True } else { Opcode::False }, &[]);
+            }
+
+            Node::Expression(Expression::Prefix {
+                operator, right, ..
+            }) => {
+                self.compile(*right)?;
+
+                match operator.as_str() {
+                    "!" => self.emit(Opcode::Bang, &[]),
+                    "-" => self.emit(Opcode::Minus, &[]),
+                    _ => return Err(format!("unknown operator {}", operator)),
+                };
+            }
+
+            _ => (),
         }
 
         Ok(())

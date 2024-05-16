@@ -35,6 +35,12 @@ pub enum Object {
     },
 }
 
+impl From<bool> for Object {
+    fn from(b: bool) -> Self {
+        Object::Boolean(b)
+    }
+}
+
 pub const NULL: &str = "null";
 pub const ERROR: &str = "error";
 pub const INTEGER: &str = "integer";

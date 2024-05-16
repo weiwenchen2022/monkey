@@ -41,8 +41,8 @@ pub fn start<R: Read, W: Write>(input: R, mut output: W) -> Result<(), Box<dyn E
             continue;
         }
 
-        let stack_top = machine.stack_top();
-        write!(&mut output, "{}", stack_top)?;
+        let last_popped = machine.last_popped_stack_elem();
+        write!(&mut output, "{}", last_popped)?;
         writeln!(&mut output)?;
     }
 

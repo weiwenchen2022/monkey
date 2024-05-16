@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::mem;
+use std::cmp::Ordering;
 
 use crate::code::{self, Instructions, Opcode};
 
@@ -51,23 +51,102 @@ impl VM {
                     self.push(self.constants[const_index as usize].clone())?;
                 }
 
-                Opcode::Add => {
-                    let right = self.pop();
-                    let left = self.pop();
-                    let Object::Integer(left_value) = left else {
-                        panic!();
-                    };
-                    let Object::Integer(right_value) = right else {
-                        panic!();
-                    };
+                Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div => {
+                    self.execute_binary_operation(op)?;
+                }
 
-                    let result = left_value + right_value;
-                    self.push(Object::Integer(result))?;
+                Opcode::Pop => {
+                    self.pop();
+                }
+
+                Opcode::True => self.push(Object::Boolean(true))?,
+                Opcode::False => self.push(Object::Boolean(false))?,
+
+                Opcode::Equal | Opcode::NotEqual | Opcode::GreaterThan => {
+                    self.execute_comparison(op)?;
+                }
+
+                Opcode::Bang => {
+                    self.execute_bang_operator()?;
+                }
+
+                Opcode::Minus => {
+                    self.execute_minus_operator()?;
                 }
             }
+
             ip += 1;
         }
         Ok(())
+    }
+
+    fn execute_minus_operator(&mut self) -> Result<()> {
+        let operand = self.pop();
+        match operand {
+            Object::Integer(_) => self.push((-operand).unwrap()),
+            _ => Err(format!("unsupported type for negation: {}", operand.ty()).into()),
+        }
+    }
+
+    fn execute_bang_operator(&mut self) -> Result<()> {
+        let operand = self.pop();
+        self.push((!operand).unwrap())
+    }
+
+    fn execute_binary_operation(&mut self, op: Opcode) -> Result<()> {
+        let right = self.pop();
+        let left = self.pop();
+
+        match (&left, &right) {
+            (Object::Integer(_), Object::Integer(_)) => {
+                self.execute_binary_integer_operation(op, left, right)
+            }
+            _ => Err(format!(
+                "unsupported types for binary operation: {} {}",
+                left.ty(),
+                right.ty()
+            )
+            .into()),
+        }
+    }
+
+    fn execute_binary_integer_operation(
+        &mut self,
+        op: Opcode,
+        left: Object,
+        right: Object,
+    ) -> Result<()> {
+        let result = match op {
+            Opcode::Add => left + right,
+            Opcode::Sub => left - right,
+            Opcode::Mul => left * right,
+            Opcode::Div => left / right,
+            _ => Err(format!("unknown integer operator: {op:?}")),
+        };
+        self.push(result?)
+    }
+
+    fn execute_comparison(&mut self, op: Opcode) -> Result<()> {
+        let right = self.pop();
+        let left = self.pop();
+
+        match op {
+            Opcode::Equal => self.push((left == right).into()),
+            Opcode::NotEqual => self.push((left != right).into()),
+            Opcode::GreaterThan => {
+                if let Some(ord) = left.partial_cmp(&right) {
+                    self.push(matches!(ord, Ordering::Greater).into())
+                } else {
+                    Err(format!(
+                        "unsupported types for binary operation: {} {}",
+                        left.ty(),
+                        right.ty(),
+                    )
+                    .into())
+                }
+            }
+            _ => Err(format!("unknown operator: {:?}", op).into()),
+        }
     }
 
     fn push(&mut self, o: Object) -> Result<()> {
@@ -81,9 +160,13 @@ impl VM {
     }
 
     fn pop(&mut self) -> Object {
-        let o = mem::replace(&mut self.stack[self.sp - 1], Object::Null);
+        let o = self.stack[self.sp - 1].clone();
         self.sp -= 1;
         o
+    }
+
+    pub(crate) fn last_popped_stack_elem(&self) -> Object {
+        self.stack[self.sp].clone()
     }
 }
 

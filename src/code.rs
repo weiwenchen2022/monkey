@@ -63,7 +63,7 @@ fn fmt_instruction<'a>(def: &'a Definition, operands: &[i64]) -> Cow<'a, str> {
     }
 
     match operand_count {
-        0 => (&def.name).into(),
+        0 => def.name.into(),
         1 => format!("{} {}", def.name, operands[0]).into(),
         _ => format!("ERROR: unhandled operand_count for {}\n", def.name).into(),
     }
@@ -72,7 +72,24 @@ fn fmt_instruction<'a>(def: &'a Definition, operands: &[i64]) -> Cow<'a, str> {
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub(crate) enum Opcode {
     Constant,
+
     Add,
+
+    Pop,
+
+    Sub,
+    Mul,
+    Div,
+
+    True,
+    False,
+
+    Equal,
+    NotEqual,
+    GreaterThan,
+
+    Minus,
+    Bang,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -88,8 +105,8 @@ impl TryFrom<u8> for Opcode {
 }
 
 pub(crate) struct Definition {
-    name: String,
-    operand_widths: Vec<u8>,
+    name: &'static str,
+    operand_widths: &'static [u8],
 }
 
 lazy_static! {
@@ -100,15 +117,92 @@ lazy_static! {
             (
                 Opcode::Constant,
                 Definition {
-                    name: "OpConstant".to_string(),
-                    operand_widths: vec![2],
+                    name: "OpConstant",
+                    operand_widths: &[2],
                 },
             ),
             (
                 Opcode::Add,
                 Definition {
-                    name: "OpAdd".to_string(),
-                    operand_widths: vec![],
+                    name: "OpAdd",
+                    operand_widths: &[],
+                },
+            ),
+            (
+                Opcode::Pop,
+                Definition {
+                    name: "OpPop",
+                    operand_widths: &[],
+                },
+            ),
+            (
+                Opcode::Sub,
+                Definition {
+                    name: "OpSub",
+                    operand_widths: &[],
+                },
+            ),
+            (
+                Opcode::Mul,
+                Definition {
+                    name: "OpMul",
+                    operand_widths: &[],
+                },
+            ),
+            (
+                Opcode::Div,
+                Definition {
+                    name: "OpDiv",
+                    operand_widths: &[],
+                },
+            ),
+            (
+                Opcode::True,
+                Definition {
+                    name: "OpTrue",
+                    operand_widths: &[],
+                },
+            ),
+            (
+                Opcode::False,
+                Definition {
+                    name: "OpFalse",
+                    operand_widths: &[],
+                },
+            ),
+            (
+                Opcode::Equal,
+                Definition {
+                    name: "OpEqual",
+                    operand_widths: &[],
+                },
+            ),
+            (
+                Opcode::NotEqual,
+                Definition {
+                    name: "OpNotEqual",
+                    operand_widths: &[],
+                },
+            ),
+            (
+                Opcode::GreaterThan,
+                Definition {
+                    name: "OpGreaterThan",
+                    operand_widths: &[],
+                },
+            ),
+            (
+                Opcode::Minus,
+                Definition {
+                    name: "OpMinus",
+                    operand_widths: &[],
+                },
+            ),
+            (
+                Opcode::Bang,
+                Definition {
+                    name: "OpBang",
+                    operand_widths: &[],
                 },
             ),
         ]);
@@ -121,6 +215,16 @@ pub fn lookup(op: u8) -> Result<&'static Definition, String> {
     DEFINITIONS
         .get(&op.try_into()?)
         .ok_or_else(|| format!("opcode {op} undefined"))
+}
+
+#[macro_export]
+macro_rules! make {
+    ($op:expr $(,)?) => {
+        $crate::code::make($op, &[])
+    };
+    ($op:expr, $($operand:expr),+ $(,)?) => {
+        $crate::code::make($op, &[$($operand),+])
+    };
 }
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -149,7 +253,7 @@ pub(crate) fn read_operands(def: &Definition, ins: &[u8]) -> (Vec<i64>, usize) {
     let mut operands = Vec::with_capacity(def.operand_widths.len());
     let mut offset = 0;
 
-    for width in &def.operand_widths {
+    for width in def.operand_widths {
         match width {
             2 => operands.push(read_u16(&ins[offset..]) as i64),
             _ => unreachable!("{width}"),

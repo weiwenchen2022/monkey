@@ -2,6 +2,8 @@ use crate::code::{self, Opcode};
 
 use super::Instructions;
 
+use crate::make;
+
 #[test]
 fn test_make() {
     struct Test {
@@ -34,9 +36,9 @@ fn test_make() {
 #[test]
 fn instructions_display() {
     let instructions = &[
-        code::make(Opcode::Add, &[]),
-        code::make(Opcode::Constant, &[2]),
-        code::make(Opcode::Constant, &[65535]),
+        make!(Opcode::Add,),
+        make!(Opcode::Constant, 2,),
+        make!(Opcode::Constant, 65535,),
     ];
 
     let expected = "0000 OpAdd
