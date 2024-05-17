@@ -1,14 +1,11 @@
-use crate::{
-    ast::{Expression, Node, Statement},
-    code::{self, Instructions, Opcode},
-    object::Object,
-};
+use crate::ast::{Expression, Node, Statement};
+use crate::code::{self, Instructions, Opcode};
+use crate::object::Object;
 
 use std::mem;
 
-pub(crate) use self::symbol_table::SymbolTable;
-
 mod symbol_table;
+pub(crate) use self::symbol_table::SymbolTable;
 
 pub struct Bytecode {
     pub(crate) instructions: Instructions,
@@ -180,6 +177,38 @@ impl Compiler {
                 };
 
                 self.emit(Opcode::GetGlobal, &[symbol.index as i64]);
+            }
+
+            Node::Expression(Expression::StringLiteral { value, .. }) => {
+                let const_index = self.add_constant(Object::String(value));
+                self.emit(Opcode::Constant, &[const_index as i64]);
+            }
+
+            Node::Expression(Expression::ArrayLiteral { elements, .. }) => {
+                let nelements = elements.len();
+                for el in elements {
+                    self.compile(el)?;
+                }
+                self.emit(Opcode::Array, &[nelements as i64]);
+            }
+
+            Node::Expression(Expression::HashLiteral { pairs, .. }) => {
+                let mut pairs: Vec<_> = pairs.into_iter().collect();
+                pairs.sort_by(|(k1, _), (k2, _)| k1.to_string().cmp(&k2.to_string()));
+
+                let n = pairs.len();
+                for (k, v) in pairs {
+                    self.compile(k)?;
+                    self.compile(v)?;
+                }
+
+                self.emit(Opcode::Hash, &[n as i64 * 2]);
+            }
+
+            Node::Expression(Expression::Index { left, index, .. }) => {
+                self.compile(*left)?;
+                self.compile(*index)?;
+                self.emit(Opcode::Index, &[]);
             }
 
             _ => (),

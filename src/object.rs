@@ -41,6 +41,12 @@ impl From<bool> for Object {
     }
 }
 
+impl From<i64> for Object {
+    fn from(i: i64) -> Self {
+        Object::Integer(i)
+    }
+}
+
 pub const NULL: &str = "null";
 pub const ERROR: &str = "error";
 pub const INTEGER: &str = "integer";

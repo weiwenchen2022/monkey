@@ -1,8 +1,8 @@
 use lazy_static::lazy_static;
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::fmt::{self, Debug, Display};
-use std::ops::DerefMut;
-use std::{collections::HashMap, ops::Deref};
+use std::ops::{Deref, DerefMut};
 
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct Instructions(Vec<u8>);
@@ -104,6 +104,10 @@ pub(crate) enum Opcode {
 
     GetGlobal,
     SetGlobal,
+
+    Array,
+    Hash,
+    Index,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -252,6 +256,27 @@ lazy_static! {
                 Definition {
                     name: "OpSetGlobal",
                     operand_widths: &[2],
+                },
+            ),
+            (
+                Opcode::Array,
+                Definition {
+                    name: "OpArray",
+                    operand_widths: &[2],
+                },
+            ),
+            (
+                Opcode::Hash,
+                Definition {
+                    name: "OpHash",
+                    operand_widths: &[2],
+                },
+            ),
+            (
+                Opcode::Index,
+                Definition {
+                    name: "OpIndex",
+                    operand_widths: &[],
                 },
             ),
         ]);

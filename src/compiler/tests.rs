@@ -1,16 +1,13 @@
-use std::any::Any;
-
-use crate::{
-    ast::Program,
-    code::{Instructions, Opcode},
-    lexer::Lexer,
-    object::Object,
-    parser::Parser,
-};
-
+use crate::ast::Program;
+use crate::code::{Instructions, Opcode};
+use crate::lexer::Lexer;
 use crate::make;
+use crate::object::Object;
+use crate::parser::Parser;
 
 use super::Compiler;
+
+use std::any::Any;
 
 struct CompilerTestCase<'a> {
     input: &'a str,
@@ -294,6 +291,177 @@ fn global_let_statements() {
     run_compiler_tests!(tests);
 }
 
+#[test]
+fn string_expressions() {
+    let tests = &[
+        CompilerTestCase {
+            input: r#""monkey""#,
+            expected_constants: vec![Box::new("monkey")],
+            expected_instructions: vec![make!(Opcode::Constant, 0), make!(Opcode::Pop)],
+        },
+        CompilerTestCase {
+            input: r#""mon" + "key""#,
+            expected_constants: vec![Box::new("mon"), Box::new("key")],
+            expected_instructions: vec![
+                make!(Opcode::Constant, 0),
+                make!(Opcode::Constant, 1),
+                make!(Opcode::Add),
+                make!(Opcode::Pop),
+            ],
+        },
+    ];
+
+    run_compiler_tests!(tests);
+}
+
+#[test]
+fn array_literals() {
+    let tests = &[
+        CompilerTestCase {
+            input: "[]",
+            expected_constants: vec![],
+            expected_instructions: vec![make!(Opcode::Array, 0), make!(Opcode::Pop)],
+        },
+        CompilerTestCase {
+            input: "[1, 2, 3]",
+            expected_constants: vec![Box::new(1), Box::new(2), Box::new(3)],
+            expected_instructions: vec![
+                make!(Opcode::Constant, 0),
+                make!(Opcode::Constant, 1),
+                make!(Opcode::Constant, 2),
+                make!(Opcode::Array, 3),
+                make!(Opcode::Pop),
+            ],
+        },
+        CompilerTestCase {
+            input: "[1 + 2, 3 - 4, 5 * 6]",
+            expected_constants: vec![
+                Box::new(1),
+                Box::new(2),
+                Box::new(3),
+                Box::new(4),
+                Box::new(5),
+                Box::new(6),
+            ],
+            expected_instructions: vec![
+                make!(Opcode::Constant, 0),
+                make!(Opcode::Constant, 1),
+                make!(Opcode::Add),
+                make!(Opcode::Constant, 2),
+                make!(Opcode::Constant, 3),
+                make!(Opcode::Sub),
+                make!(Opcode::Constant, 4),
+                make!(Opcode::Constant, 5),
+                make!(Opcode::Mul),
+                make!(Opcode::Array, 3),
+                make!(Opcode::Pop),
+            ],
+        },
+    ];
+
+    run_compiler_tests!(tests);
+}
+
+#[test]
+fn hash_literals() {
+    let tests = &[
+        CompilerTestCase {
+            input: "{}",
+            expected_constants: vec![],
+            expected_instructions: vec![make!(Opcode::Hash, 0), make!(Opcode::Pop)],
+        },
+        CompilerTestCase {
+            input: "{1: 2, 3: 4, 5: 6}",
+            expected_constants: vec![
+                Box::new(1),
+                Box::new(2),
+                Box::new(3),
+                Box::new(4),
+                Box::new(5),
+                Box::new(6),
+            ],
+            expected_instructions: vec![
+                make!(Opcode::Constant, 0),
+                make!(Opcode::Constant, 1),
+                make!(Opcode::Constant, 2),
+                make!(Opcode::Constant, 3),
+                make!(Opcode::Constant, 4),
+                make!(Opcode::Constant, 5),
+                make!(Opcode::Hash, 6),
+                make!(Opcode::Pop),
+            ],
+        },
+        CompilerTestCase {
+            input: "{1: 2 + 3, 4: 5 * 6}",
+            expected_constants: vec![
+                Box::new(1),
+                Box::new(2),
+                Box::new(3),
+                Box::new(4),
+                Box::new(5),
+                Box::new(6),
+            ],
+            expected_instructions: vec![
+                make!(Opcode::Constant, 0),
+                make!(Opcode::Constant, 1),
+                make!(Opcode::Constant, 2),
+                make!(Opcode::Add),
+                make!(Opcode::Constant, 3),
+                make!(Opcode::Constant, 4),
+                make!(Opcode::Constant, 5),
+                make!(Opcode::Mul),
+                make!(Opcode::Hash, 4),
+                make!(Opcode::Pop),
+            ],
+        },
+    ];
+
+    run_compiler_tests!(tests);
+}
+
+#[test]
+fn index_expressions() {
+    let tests = &[
+        CompilerTestCase {
+            input: "[1, 2, 3][1 + 1]",
+            expected_constants: vec![
+                Box::new(1),
+                Box::new(2),
+                Box::new(3),
+                Box::new(1),
+                Box::new(1),
+            ],
+            expected_instructions: vec![
+                make!(Opcode::Constant, 0),
+                make!(Opcode::Constant, 1),
+                make!(Opcode::Constant, 2),
+                make!(Opcode::Array, 3),
+                make!(Opcode::Constant, 3),
+                make!(Opcode::Constant, 4),
+                make!(Opcode::Add),
+                make!(Opcode::Index),
+                make!(Opcode::Pop),
+            ],
+        },
+        CompilerTestCase {
+            input: "{1: 2}[2 - 1]",
+            expected_constants: vec![Box::new(1), Box::new(2), Box::new(2), Box::new(1)],
+            expected_instructions: vec![
+                make!(Opcode::Constant, 0),
+                make!(Opcode::Constant, 1),
+                make!(Opcode::Hash, 2),
+                make!(Opcode::Constant, 2),
+                make!(Opcode::Constant, 3),
+                make!(Opcode::Sub),
+                make!(Opcode::Index),
+                make!(Opcode::Pop),
+            ],
+        },
+    ];
+
+    run_compiler_tests!(tests);
+}
+
 fn parse(input: &str) -> Program {
     let l = Lexer::new(input.as_bytes());
     let mut p = Parser::new(l);
@@ -319,7 +487,9 @@ fn test_constants(expected: &[Box<dyn Any>], actual: &[Object]) {
 
     for (i, constant) in expected.iter().enumerate() {
         if let Some(constant) = constant.downcast_ref::<i32>().copied() {
-            test_integer_object(constant as i64, &actual[i])
+            test_integer_object(constant as i64, &actual[i]);
+        } else if let Some(constant) = constant.downcast_ref::<&str>() {
+            test_string_object(constant, &actual[i]);
         } else {
             panic!("type_id {:?}", constant.as_ref().type_id());
         }
@@ -329,6 +499,13 @@ fn test_constants(expected: &[Box<dyn Any>], actual: &[Object]) {
 fn test_integer_object(expected: i64, actual: &Object) {
     let &Object::Integer(actual) = actual else {
         panic!("object is not Integer. got={}", actual.ty());
+    };
+    assert_eq!(expected, actual);
+}
+
+fn test_string_object(expected: &str, actual: &Object) {
+    let Object::String(actual) = actual else {
+        panic!("object is not String. got={}", actual.ty());
     };
     assert_eq!(expected, actual);
 }

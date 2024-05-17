@@ -1,10 +1,10 @@
-use std::borrow::Cow;
-use std::cmp::Ordering;
-
 use crate::code::{self, Instructions, Opcode};
-
 use crate::compiler::Bytecode;
 use crate::object::Object;
+
+use std::borrow::Cow;
+use std::cmp::Ordering;
+use std::collections::HashMap;
 
 const STACK_SIZE: usize = 2048;
 pub(crate) const GLOBALS_SIZE: usize = 65536;
@@ -116,11 +116,95 @@ impl VM {
 
                     self.push(self.globals[global_index as usize].clone())?;
                 }
+
+                Opcode::Array => {
+                    let num_elements = code::read_u16(&instructions[ip + 1..]);
+                    ip += 2;
+
+                    let array = self.build_array(self.sp - num_elements as usize, self.sp);
+                    self.sp -= num_elements as usize;
+
+                    self.push(array)?;
+                }
+
+                Opcode::Hash => {
+                    let num_elements = code::read_u16(&instructions[ip + 1..]);
+                    ip += 2;
+
+                    let hash = self.build_hash(self.sp - num_elements as usize, self.sp)?;
+
+                    self.sp -= num_elements as usize;
+
+                    self.push(hash)?;
+                }
+
+                Opcode::Index => {
+                    let index = self.pop();
+                    let left = self.pop();
+
+                    self.execute_index_expression(left, index)?;
+                }
             }
 
             ip += 1;
         }
         Ok(())
+    }
+
+    fn execute_index_expression(&mut self, left: Object, index: Object) -> Result<()> {
+        match (&left, &index) {
+            (Object::Array(_), Object::Integer(_)) => self.execute_array_index(left, index),
+            (Object::Hash(_), _) => self.execute_hash_index(left, index),
+            _ => Err(format!("index operator not supported: {}", left.ty()).into()),
+        }
+    }
+
+    fn execute_array_index(&mut self, left: Object, index: Object) -> Result<()> {
+        let Object::Array(elements) = left else {
+            unreachable!()
+        };
+        let Object::Integer(i) = index else {
+            unreachable!();
+        };
+
+        self.push(elements.get(i as usize).cloned().unwrap_or(Object::Null))
+    }
+
+    fn execute_hash_index(&mut self, left: Object, index: Object) -> Result<()> {
+        let Object::Hash(pairs) = left else {
+            unreachable!();
+        };
+
+        if !index.is_hashable() {
+            return Err(format!("unusable as hash key: {}", index.ty()).into());
+        }
+
+        self.push(pairs.get(&index).cloned().unwrap_or(Object::Null))
+    }
+
+    fn build_hash(&mut self, start_index: usize, end_index: usize) -> Result<Object> {
+        let mut hashed = HashMap::with_capacity((end_index - start_index) / 2);
+
+        for i in (start_index..end_index).step_by(2) {
+            let key = std::mem::replace(&mut self.stack[i], Object::Null);
+            let value = std::mem::replace(&mut self.stack[i + 1], Object::Null);
+
+            if !key.is_hashable() {
+                return Err(format!("unusable as hash key: {}", key.ty()).into());
+            }
+
+            hashed.insert(key, value);
+        }
+
+        Ok(Object::Hash(hashed))
+    }
+
+    fn build_array(&mut self, start_index: usize, end_index: usize) -> Object {
+        let mut elements = Vec::with_capacity(end_index - start_index);
+        for i in start_index..end_index {
+            elements.push(std::mem::replace(&mut self.stack[i], Object::Null));
+        }
+        Object::Array(elements)
     }
 
     fn execute_minus_operator(&mut self) -> Result<()> {
@@ -144,6 +228,10 @@ impl VM {
             (Object::Integer(_), Object::Integer(_)) => {
                 self.execute_binary_integer_operation(op, left, right)
             }
+            (Object::String(_), Object::String(_)) => {
+                self.execute_binary_string_operation(op, left, right)
+            }
+
             _ => Err(format!(
                 "unsupported types for binary operation: {} {}",
                 left.ty(),
@@ -165,6 +253,19 @@ impl VM {
             Opcode::Mul => left * right,
             Opcode::Div => left / right,
             _ => Err(format!("unknown integer operator: {op:?}")),
+        };
+        self.push(result?)
+    }
+
+    fn execute_binary_string_operation(
+        &mut self,
+        op: Opcode,
+        left: Object,
+        right: Object,
+    ) -> Result<()> {
+        let result = match op {
+            Opcode::Add => left + right,
+            _ => Err(format!("unknown string operator: {op:?}")),
         };
         self.push(result?)
     }
