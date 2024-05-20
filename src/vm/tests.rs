@@ -395,6 +395,270 @@ fn index_expressions() {
     run_vm_tests!(tests);
 }
 
+#[test]
+fn calling_functions_without_argument() {
+    let tests = &[
+        VmTestCase {
+            input: "
+		let fivePlusTen = fn() { 5 + 10; };
+		fivePlusTen();
+		",
+            expected: Box::new(15),
+        },
+        VmTestCase {
+            input: "
+		let one = fn() { 1; };
+		let two = fn() { 2; };
+		one() + two()
+		",
+            expected: Box::new(3),
+        },
+        VmTestCase {
+            input: "
+		let a = fn() { 1 };
+		let b = fn() { a() + 1 };
+		let c = fn() { b() + 1 };
+		c();
+		",
+            expected: Box::new(3),
+        },
+    ];
+
+    run_vm_tests!(tests);
+}
+
+#[test]
+fn functions_with_return_statement() {
+    let tests = &[
+        VmTestCase {
+            input: "
+		let earlyExit = fn() { return 99; 100; };
+		earlyExit();
+		",
+            expected: Box::new(99),
+        },
+        VmTestCase {
+            input: "
+		let earlyExit = fn() { return 99; return 100; };
+		earlyExit();
+		",
+            expected: Box::new(99),
+        },
+    ];
+
+    run_vm_tests!(tests);
+}
+
+#[test]
+fn functions_without_return_value() {
+    let tests = &[
+        VmTestCase {
+            input: "
+		let noReturn = fn() { };
+		noReturn();
+		",
+            expected: Box::new(()),
+        },
+        VmTestCase {
+            input: "
+		let noReturn = fn() { };
+		let noReturnTwo = fn() { noReturn(); };
+		noReturn();
+		noReturnTwo();
+		",
+            expected: Box::new(()),
+        },
+    ];
+
+    run_vm_tests!(tests);
+}
+
+#[test]
+fn first_calss_functions() {
+    let tests = &[
+        VmTestCase {
+            input: "
+		let returnsOne = fn() { 1; };
+		let returnsOneReturner = fn() { returnsOne; };
+		returnsOneReturner()();
+		",
+            expected: Box::new(1),
+        },
+        VmTestCase {
+            input: "
+		let returnsOneReturner = fn() {
+			let returnsOne = fn() { 1; };
+			returnsOne;
+		};
+		returnsOneReturner()();
+		",
+            expected: Box::new(1),
+        },
+    ];
+
+    run_vm_tests!(tests);
+}
+
+#[test]
+fn calling_functions_with_bindings() {
+    let tests = &[
+        VmTestCase {
+            input: "
+		let one = fn() { let one = 1; one };
+		one();
+		",
+            expected: Box::new(1),
+        },
+        VmTestCase {
+            input: "
+		let oneAndTwo = fn() { let one = 1; let two = 2; one + two; };
+		oneAndTwo();
+		",
+            expected: Box::new(3),
+        },
+        VmTestCase {
+            input: "
+		let oneAndTwo = fn() { let one = 1; let two = 2; one + two; };
+		let threeAndFour = fn() { let three = 3; let four = 4; three + four; };
+		oneAndTwo() + threeAndFour();
+		",
+            expected: Box::new(10),
+        },
+        VmTestCase {
+            input: "
+		let firstFoobar = fn() { let foobar = 50; foobar; };
+		let secondFoobar = fn() { let foobar = 100; foobar; };
+		firstFoobar() + secondFoobar();
+		",
+            expected: Box::new(150),
+        },
+        VmTestCase {
+            input: "
+		let globalSeed = 50;
+		let minusOne = fn() {
+			let num = 1;
+			globalSeed - num;
+		}
+		let minusTwo = fn() {
+			let num = 2;
+			globalSeed - num;
+		}
+		minusOne() + minusTwo();
+		",
+            expected: Box::new(97),
+        },
+    ];
+
+    run_vm_tests!(tests);
+}
+
+#[test]
+fn calling_functions_with_arguments_and_bindings() {
+    let tests = &[
+        VmTestCase {
+            input: "
+		let identity = fn(a) { a; };
+		identity(4);
+		",
+            expected: Box::new(4),
+        },
+        VmTestCase {
+            input: "
+        let sum = fn(a, b) { a + b; };
+        sum(1, 2);
+        ",
+            expected: Box::new(3),
+        },
+        VmTestCase {
+            input: "
+        let sum = fn(a, b) {
+        	let c = a + b;
+        	c;
+        };
+        sum(1, 2);
+        ",
+            expected: Box::new(3),
+        },
+        VmTestCase {
+            input: "
+        let sum = fn(a, b) {
+        	let c = a + b;
+        	c;
+        };
+        sum(1, 2) + sum(3, 4);
+        ",
+            expected: Box::new(10),
+        },
+        VmTestCase {
+            input: "
+        let sum = fn(a, b) {
+        	let c = a + b;
+        	c;
+        };
+        let outer = fn() {
+        	sum(1, 2) + sum(3, 4);
+        };
+        outer();
+        ",
+            expected: Box::new(10),
+        },
+        VmTestCase {
+            input: "
+        let globalNum = 10;
+
+        let sum = fn(a, b) {
+        	let c = a + b;
+        	c + globalNum;
+        };
+
+        let outer = fn() {
+        	sum(1, 2) + sum(3, 4) + globalNum;
+        };
+
+        outer() + globalNum;
+        ",
+            expected: Box::new(50),
+        },
+    ];
+
+    run_vm_tests!(tests);
+}
+
+#[test]
+fn calling_functions_with_wrong_arguments() {
+    let tests = &[
+        VmTestCase {
+            input: "fn() { 1; }(1);",
+            expected: Box::new("wrong number of arguments: want=0, got=1"),
+        },
+        VmTestCase {
+            input: "fn(a) { a; }();",
+            expected: Box::new("wrong number of arguments: want=1, got=0"),
+        },
+        VmTestCase {
+            input: "fn(a, b) { a + b; }(1);",
+            expected: Box::new("wrong number of arguments: want=2, got=1"),
+        },
+    ];
+
+    for tt in tests {
+        let program = parse(tt.input);
+
+        let mut comp = Compiler::new();
+        comp.compile(program).expect("compiler error: ");
+
+        let mut vm = VM::new(comp.bytecode());
+        let err = vm
+            .run()
+            .err()
+            .expect("expected VM error but resulted in none.");
+        assert_eq!(
+            tt.expected.downcast_ref::<&'static str>().copied().unwrap(),
+            err
+        );
+    }
+}
+
 fn parse(input: &str) -> Program {
     let l = Lexer::new(input.as_bytes());
     let mut p = Parser::new(l);

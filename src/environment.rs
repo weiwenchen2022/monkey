@@ -6,15 +6,15 @@ use crate::object::Object;
 
 #[derive(Clone)]
 pub struct Environment {
-    store: Rc<RefCell<HashMap<String, Object>>>,
     outer: Option<Box<Environment>>,
+    store: Rc<RefCell<HashMap<String, Object>>>,
 }
 
 impl Environment {
     pub fn new(outer: Option<Box<Environment>>) -> Self {
         Self {
-            store: Rc::new(RefCell::new(HashMap::new())),
             outer,
+            store: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 

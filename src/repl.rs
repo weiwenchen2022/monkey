@@ -14,7 +14,7 @@ pub fn start<R: Read, W: Write>(input: R, mut output: W) -> Result<(), Box<dyn E
 
     let mut constants = Vec::new();
     let mut globals = vec![Object::Null; vm::GLOBALS_SIZE];
-    let mut symbol_table = SymbolTable::new();
+    let mut symbol_table = SymbolTable::new(None);
 
     loop {
         write!(&mut output, "{}", PROMT)?;

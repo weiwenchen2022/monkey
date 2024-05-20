@@ -33,6 +33,12 @@ pub enum Object {
         body: Statement,
         env: Environment,
     },
+
+    CompiledFunction {
+        instructions: Instructions,
+        num_locals: u8,
+        num_parameters: u8,
+    },
 }
 
 impl From<bool> for Object {
@@ -59,6 +65,7 @@ pub const ARRAY: &str = "array";
 pub const HASH: &str = "hash";
 pub const QUOTE: &str = "quote";
 pub const MARCO: &str = "macro";
+pub const COMPILED_FUNCTION: &str = "compiled_function";
 
 impl Object {
     pub fn ty(&self) -> &'static str {
@@ -75,6 +82,7 @@ impl Object {
             Object::Hash(_) => HASH,
             Object::Quote(_) => QUOTE,
             Object::Macro { .. } => MARCO,
+            Object::CompiledFunction { .. } => COMPILED_FUNCTION,
         }
     }
 
@@ -153,6 +161,8 @@ impl Display for Object {
                 write!(f, "{}", body)?;
                 write!(f, "\n}}")
             }
+
+            Object::CompiledFunction { .. } => write!(f, "compiled function [{:p}]", self),
         }
     }
 }
@@ -259,6 +269,7 @@ impl Eq for Object {}
 use std::cmp::Ordering;
 
 use crate::ast::{Expression, Node, Statement};
+use crate::code::Instructions;
 use crate::environment::Environment;
 use crate::evaluator;
 

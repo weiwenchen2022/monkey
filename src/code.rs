@@ -108,6 +108,14 @@ pub(crate) enum Opcode {
     Array,
     Hash,
     Index,
+
+    Call,
+
+    ReturnValue,
+    Return,
+
+    GetLocal,
+    SetLocal,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -279,6 +287,41 @@ lazy_static! {
                     operand_widths: &[],
                 },
             ),
+            (
+                Opcode::Call,
+                Definition {
+                    name: "OpCall",
+                    operand_widths: &[1],
+                },
+            ),
+            (
+                Opcode::ReturnValue,
+                Definition {
+                    name: "OpReturnValue",
+                    operand_widths: &[],
+                },
+            ),
+            (
+                Opcode::Return,
+                Definition {
+                    name: "OpReturn",
+                    operand_widths: &[],
+                },
+            ),
+            (
+                Opcode::GetLocal,
+                Definition {
+                    name: "OpGetLocal",
+                    operand_widths: &[1],
+                },
+            ),
+            (
+                Opcode::SetLocal,
+                Definition {
+                    name: "OpSetLocal",
+                    operand_widths: &[1],
+                },
+            ),
         ]);
 
         definitions
@@ -316,6 +359,7 @@ pub(crate) fn make(op: Opcode, operands: &[i64]) -> Instructions {
         let width = def.operand_widths[i];
         match width {
             2 => instruction.write_u16::<BigEndian>(*o as u16).unwrap(),
+            1 => instruction.write_u8(*o as u8).unwrap(),
             _ => todo!("{width}"),
         }
     }
@@ -330,6 +374,7 @@ pub(crate) fn read_operands(def: &Definition, ins: &[u8]) -> (Vec<i64>, usize) {
     for width in def.operand_widths {
         match width {
             2 => operands.push(read_u16(&ins[offset..]) as i64),
+            1 => operands.push(read_u8(&ins[offset..]) as i64),
             _ => unreachable!("{width}"),
         }
         offset += *width as usize;
@@ -340,6 +385,10 @@ pub(crate) fn read_operands(def: &Definition, ins: &[u8]) -> (Vec<i64>, usize) {
 
 pub(crate) fn read_u16(mut ins: &[u8]) -> u16 {
     ins.read_u16::<BigEndian>().unwrap()
+}
+
+pub(crate) fn read_u8(ins: &[u8]) -> u8 {
+    ins[0]
 }
 
 #[cfg(test)]

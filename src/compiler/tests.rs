@@ -1,5 +1,6 @@
 use crate::ast::Program;
 use crate::code::{Instructions, Opcode};
+use crate::compiler::SymbolTable;
 use crate::lexer::Lexer;
 use crate::make;
 use crate::object::Object;
@@ -8,6 +9,7 @@ use crate::parser::Parser;
 use super::Compiler;
 
 use std::any::Any;
+use std::vec;
 
 struct CompilerTestCase<'a> {
     input: &'a str,
@@ -462,6 +464,265 @@ fn index_expressions() {
     run_compiler_tests!(tests);
 }
 
+#[test]
+fn functions() {
+    let tests = &[
+        CompilerTestCase {
+            input: "fn() { return 5 + 10 }",
+            expected_constants: vec![
+                Box::new(5),
+                Box::new(10),
+                Box::new(vec![
+                    make!(Opcode::Constant, 0),
+                    make!(Opcode::Constant, 1),
+                    make!(Opcode::Add),
+                    make!(Opcode::ReturnValue),
+                ]),
+            ],
+            expected_instructions: vec![make!(Opcode::Constant, 2), make!(Opcode::Pop)],
+        },
+        CompilerTestCase {
+            input: "fn() { 5 + 10 }",
+            expected_constants: vec![
+                Box::new(5),
+                Box::new(10),
+                Box::new(vec![
+                    make!(Opcode::Constant, 0),
+                    make!(Opcode::Constant, 1),
+                    make!(Opcode::Add),
+                    make!(Opcode::ReturnValue),
+                ]),
+            ],
+            expected_instructions: vec![make!(Opcode::Constant, 2), make!(Opcode::Pop)],
+        },
+        CompilerTestCase {
+            input: "fn() { 1; 2 }",
+            expected_constants: vec![
+                Box::new(1),
+                Box::new(2),
+                Box::new(vec![
+                    make!(Opcode::Constant, 0),
+                    make!(Opcode::Pop),
+                    make!(Opcode::Constant, 1),
+                    make!(Opcode::ReturnValue),
+                ]),
+            ],
+            expected_instructions: vec![make!(Opcode::Constant, 2), make!(Opcode::Pop)],
+        },
+    ];
+
+    run_compiler_tests!(tests);
+}
+
+#[test]
+fn compiler_scopes() {
+    let mut comipler = Compiler::new();
+    assert_eq!(0, comipler.scope_index);
+
+    let global_symbol_table = &comipler.symbol_table as *const SymbolTable;
+
+    comipler.emit(Opcode::Mul, &[]);
+
+    comipler.enter_scope();
+
+    assert_eq!(1, comipler.scope_index);
+
+    comipler.emit(Opcode::Sub, &[]);
+
+    assert_eq!(1, comipler.scopes[comipler.scope_index].instructions.len());
+
+    let last = &comipler.scopes[comipler.scope_index].last_instruction;
+    assert_eq!(Opcode::Sub, last.opcode);
+
+    // assert!(std::ptr::eq(
+    //     global_symbol_table,
+    //     comipler.symbol_table.outer.as_ref().unwrap().as_ref() as *const SymbolTable,
+    // ));
+
+    comipler.leave_scope();
+
+    assert_eq!(0, comipler.scope_index);
+
+    assert!(std::ptr::eq(
+        global_symbol_table,
+        &comipler.symbol_table as *const SymbolTable
+    ));
+    assert!(comipler.symbol_table.outer.is_none());
+
+    comipler.emit(Opcode::Add, &[]);
+
+    assert_eq!(2, comipler.scopes[comipler.scope_index].instructions.len());
+
+    let last = &comipler.scopes[comipler.scope_index].last_instruction;
+    assert_eq!(Opcode::Add, last.opcode);
+
+    let previous = &comipler.scopes[comipler.scope_index].previous_instruction;
+    assert_eq!(Opcode::Mul, previous.opcode);
+}
+
+#[test]
+fn functions_without_return_value() {
+    let tests = &[CompilerTestCase {
+        input: "fn() { }",
+        expected_constants: vec![Box::new(vec![make!(Opcode::Return)])],
+        expected_instructions: vec![make!(Opcode::Constant, 0), make!(Opcode::Pop)],
+    }];
+    run_compiler_tests!(tests);
+}
+
+#[test]
+fn function_calls() {
+    let tests = &[
+        CompilerTestCase {
+            input: "fn() { 24 }();",
+            expected_constants: vec![
+                Box::new(24),
+                Box::new(vec![make!(Opcode::Constant, 0), make!(Opcode::ReturnValue)]),
+            ],
+            expected_instructions: vec![
+                make!(Opcode::Constant, 1),
+                make!(Opcode::Call, 0),
+                make!(Opcode::Pop),
+            ],
+        },
+        CompilerTestCase {
+            input: "
+			let noArg = fn() { 24 };
+			noArg();
+			",
+            expected_constants: vec![
+                Box::new(24),
+                Box::new(vec![make!(Opcode::Constant, 0), make!(Opcode::ReturnValue)]),
+            ],
+            expected_instructions: vec![
+                make!(Opcode::Constant, 1),
+                make!(Opcode::SetGlobal, 0),
+                make!(Opcode::GetGlobal, 0),
+                make!(Opcode::Call, 0),
+                make!(Opcode::Pop),
+            ],
+        },
+        CompilerTestCase {
+            input: "
+			let oneArg = fn(a) { a };
+			oneArg(24);
+			",
+            expected_constants: vec![
+                Box::new(vec![make!(Opcode::GetLocal, 0), make!(Opcode::ReturnValue)]),
+                Box::new(24),
+            ],
+            expected_instructions: vec![
+                make!(Opcode::Constant, 0),
+                make!(Opcode::SetGlobal, 0),
+                make!(Opcode::GetGlobal, 0),
+                make!(Opcode::Constant, 1),
+                make!(Opcode::Call, 1),
+                make!(Opcode::Pop),
+            ],
+        },
+        // CompilerTestCase {
+        //     input: "
+        // 	let manyArg = fn(a, b, c) { a; b; c };
+        // 	manyArg(24, 25, 26);
+        // 	",
+        //     expected_constants: vec![
+        //         Box::new(vec![
+        //             make!(Opcode::GetLocal, 0),
+        //             make!(Opcode::Pop),
+        //             make!(Opcode::GetLocal, 1),
+        //             make!(Opcode::Pop),
+        //             make!(Opcode::GetLocal, 2),
+        //             make!(Opcode::ReturnValue),
+        //         ]),
+        //         Box::new(24),
+        //         Box::new(25),
+        //         Box::new(26),
+        //     ],
+        //     expected_instructions: vec![
+        //         make!(Opcode::Constant, 0),
+        //         make!(Opcode::SetGlobal, 0),
+        //         make!(Opcode::GetGlobal, 0),
+        //         make!(Opcode::Constant, 1),
+        //         make!(Opcode::Constant, 2),
+        //         make!(Opcode::Constant, 3),
+        //         make!(Opcode::Call, 3),
+        //         make!(Opcode::Pop),
+        //     ],
+        // },
+    ];
+
+    run_compiler_tests!(tests);
+}
+
+#[test]
+fn let_statement_scopes() {
+    let tests = &[
+        CompilerTestCase {
+            input: "
+			let num = 55;
+			fn() { num }
+			",
+            expected_constants: vec![
+                Box::new(55),
+                Box::new(vec![
+                    make!(Opcode::GetGlobal, 0),
+                    make!(Opcode::ReturnValue),
+                ]),
+            ],
+            expected_instructions: vec![
+                make!(Opcode::Constant, 0),
+                make!(Opcode::SetGlobal, 0),
+                make!(Opcode::Constant, 1),
+                make!(Opcode::Pop),
+            ],
+        },
+        CompilerTestCase {
+            input: "
+			fn() {
+				let num = 55;
+				num
+			}
+			",
+            expected_constants: vec![
+                Box::new(55),
+                Box::new(vec![
+                    make!(Opcode::Constant, 0),
+                    make!(Opcode::SetLocal, 0),
+                    make!(Opcode::GetLocal, 0),
+                    make!(Opcode::ReturnValue),
+                ]),
+            ],
+            expected_instructions: vec![make!(Opcode::Constant, 1), make!(Opcode::Pop)],
+        },
+        CompilerTestCase {
+            input: "
+			fn() {
+				let a = 55;
+				let b = 77;
+				a + b
+			}
+			",
+            expected_constants: vec![
+                Box::new(55),
+                Box::new(77),
+                Box::new(vec![
+                    make!(Opcode::Constant, 0),
+                    make!(Opcode::SetLocal, 0),
+                    make!(Opcode::Constant, 1),
+                    make!(Opcode::SetLocal, 1),
+                    make!(Opcode::GetLocal, 0),
+                    make!(Opcode::GetLocal, 1),
+                    make!(Opcode::Add),
+                    make!(Opcode::ReturnValue),
+                ]),
+            ],
+            expected_instructions: vec![make!(Opcode::Constant, 2), make!(Opcode::Pop)],
+        },
+    ];
+
+    run_compiler_tests!(tests);
+}
+
 fn parse(input: &str) -> Program {
     let l = Lexer::new(input.as_bytes());
     let mut p = Parser::new(l);
@@ -490,6 +751,12 @@ fn test_constants(expected: &[Box<dyn Any>], actual: &[Object]) {
             test_integer_object(constant as i64, &actual[i]);
         } else if let Some(constant) = constant.downcast_ref::<&str>() {
             test_string_object(constant, &actual[i]);
+        } else if let Some(constant) = constant.downcast_ref::<Vec<Instructions>>() {
+            let Object::CompiledFunction { instructions, .. } = &actual[i] else {
+                panic!("constant %d - not a function: {}", &actual[i].ty())
+            };
+
+            test_instructions(constant, instructions);
         } else {
             panic!("type_id {:?}", constant.as_ref().type_id());
         }

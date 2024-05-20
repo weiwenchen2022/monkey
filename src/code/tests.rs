@@ -23,6 +23,11 @@ fn test_make() {
             operands: vec![],
             expected: vec![Opcode::Add as u8],
         },
+        Test {
+            op: Opcode::GetLocal,
+            operands: vec![255],
+            expected: vec![Opcode::GetLocal as u8, 255],
+        },
     ];
 
     for tt in tests {
@@ -37,13 +42,15 @@ fn test_make() {
 fn instructions_display() {
     let instructions = &[
         make!(Opcode::Add,),
+        make!(Opcode::GetLocal, 1),
         make!(Opcode::Constant, 2,),
         make!(Opcode::Constant, 65535,),
     ];
 
     let expected = "0000 OpAdd
-0001 OpConstant 2
-0004 OpConstant 65535
+0001 OpGetLocal 1
+0003 OpConstant 2
+0006 OpConstant 65535
 ";
 
     let concatted: Instructions = instructions
@@ -64,11 +71,18 @@ fn read_operands() {
         operands: &'a [i64],
         bytes_read: usize,
     }
-    let tests: &[Test] = &[Test {
-        op: Opcode::Constant,
-        operands: &[65535],
-        bytes_read: 2,
-    }];
+    let tests: &[Test] = &[
+        Test {
+            op: Opcode::Constant,
+            operands: &[65535],
+            bytes_read: 2,
+        },
+        Test {
+            op: Opcode::GetLocal,
+            operands: &[255],
+            bytes_read: 1,
+        },
+    ];
 
     for tt in tests {
         let instruction = code::make(tt.op, tt.operands);
