@@ -85,15 +85,15 @@ pub(crate) static BUILTINS: &[(&str, BuiltinFunction)] = &[
     }),
 ];
 
-pub(crate) fn get_builtin_by_name(name: &str) -> Option<Object> {
-    BUILTINS.iter().find_map(|def| {
-        if name == def.0 {
-            Some(Object::Builtin(def.1))
-        } else {
-            None
-        }
-    })
-}
+// pub(crate) fn get_builtin_by_name(name: &str) -> Option<Object> {
+//     BUILTINS.iter().find_map(|def| {
+//         if name == def.0 {
+//             Some(Object::Builtin(def.1))
+//         } else {
+//             None
+//         }
+//     })
+// }
 
 pub(crate) fn get_builtin_function_by_name(name: &str) -> Option<BuiltinFunction> {
     BUILTINS

@@ -1,6 +1,5 @@
 use super::Object;
 use fnv::FnvBuildHasher;
-use std::rc::Rc;
 
 #[test]
 fn string_hashkey() {

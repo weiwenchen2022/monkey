@@ -1,5 +1,7 @@
+use std::cell::RefCell;
 use std::error::Error;
 use std::io::{BufRead, BufReader, Read, Write};
+use std::rc::Rc;
 
 use crate::compiler::{Compiler, SymbolTable};
 use crate::lexer::Lexer;
@@ -14,10 +16,10 @@ pub fn start<R: Read, W: Write>(input: R, mut output: W) -> Result<(), Box<dyn E
 
     let mut constants = Vec::new();
     let mut globals = vec![Object::Null; vm::GLOBALS_SIZE];
-    let mut symbol_table = SymbolTable::new(None);
+    let symbol_table = Rc::new(RefCell::new(SymbolTable::new(None)));
 
     for (i, v) in object::BUILTINS.iter().enumerate() {
-        symbol_table.define_builtin(i, v.0.to_string());
+        symbol_table.borrow_mut().define_builtin(i, v.0.to_string());
     }
 
     loop {
@@ -38,9 +40,9 @@ pub fn start<R: Read, W: Write>(input: R, mut output: W) -> Result<(), Box<dyn E
             continue;
         }
 
-        let mut comp = Compiler::new_with_state(symbol_table, constants);
+        let mut comp = Compiler::new_with_state(Rc::clone(&symbol_table), constants);
         if let Err(err) = comp.compile(program) {
-            symbol_table = comp.symbol_table;
+            // symbol_table = comp.symbol_table;
             constants = comp.constants;
 
             writeln!(&mut output, "Woops! Compilation failed:\n {err}")?;
@@ -48,7 +50,8 @@ pub fn start<R: Read, W: Write>(input: R, mut output: W) -> Result<(), Box<dyn E
         }
 
         let code = comp.bytecode();
-        symbol_table = comp.symbol_table;
+        // symbol_table = comp.symbol_table;
+
         constants = code.constants.clone();
 
         let mut machine = VM::new_with_global_store(code, globals);

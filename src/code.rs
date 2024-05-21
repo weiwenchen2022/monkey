@@ -71,6 +71,7 @@ fn fmt_instruction<'a>(def: &'a Definition, operands: &[i64]) -> Cow<'a, str> {
     match operand_count {
         0 => def.name.into(),
         1 => format!("{} {}", def.name, operands[0]).into(),
+        2 => format!("{} {} {}", def.name, operands[0], operands[1]).into(),
         _ => format!("ERROR: unhandled operand_count for {}\n", def.name).into(),
     }
 }
@@ -118,6 +119,9 @@ pub(crate) enum Opcode {
     SetLocal,
 
     GetBuiltin,
+
+    Closure,
+    GetFree,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -328,6 +332,20 @@ lazy_static! {
                 Opcode::GetBuiltin,
                 Definition {
                     name: "OpGetBuiltin",
+                    operand_widths: &[1],
+                },
+            ),
+            (
+                Opcode::Closure,
+                Definition {
+                    name: "OpClosure",
+                    operand_widths: &[2, 1],
+                },
+            ),
+            (
+                Opcode::GetFree,
+                Definition {
+                    name: "OpGetFree",
                     operand_widths: &[1],
                 },
             ),

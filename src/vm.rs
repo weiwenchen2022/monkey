@@ -41,7 +41,11 @@ impl VM {
             num_locals: 0,
             num_parameters: 0,
         };
-        let main_frame = Frame::new(main_fn, 0);
+        let main_closure = Object::Closure {
+            f: Box::new(main_fn),
+            free: vec![],
+        };
+        let main_frame = Frame::new(main_closure, 0);
 
         let mut frames = vec![Frame::default(); MAX_FRAMES];
         frames[0] = main_frame;
@@ -227,26 +231,55 @@ impl VM {
                     let definition = object::BUILTINS[builtin_index as usize];
                     self.push(Object::Builtin(definition.1))?;
                 }
+
+                Opcode::Closure => {
+                    let const_index = code::read_u16(&ins[ip + 1..]);
+                    let _ = code::read_u8(&ins[ip + 3..]);
+                    self.current_frame().ip += 3;
+
+                    self.push_closure(const_index as usize)?;
+                }
+
+                _ => {
+                    eprintln!("todo!{op:?}")
+                }
             }
         }
         Ok(())
     }
 
+    fn push_closure(&mut self, const_index: usize) -> Result<()> {
+        let constant = &self.constants[const_index];
+        if !matches!(constant, Object::CompiledFunction { .. }) {
+            return Err(format!("not a function: {}", constant.ty()).into());
+        }
+
+        let closure = Object::Closure {
+            f: Box::new(constant.clone()),
+            free: vec![],
+        };
+        self.push(closure)
+    }
+
     fn execute_call(&mut self, num_args: usize) -> Result<()> {
         let callee = self.stack[self.sp - 1 - num_args].clone();
         match callee {
-            Object::CompiledFunction { .. } => self.call_function(&callee, num_args),
+            Object::Closure { .. } => self.call_closure(callee, num_args),
             Object::Builtin(_) => self.call_builtin(&callee, num_args),
-            _ => Err("calling non-function and non-built-in".into()),
+            _ => Err("calling non-closure and non-builtin".into()),
         }
     }
 
-    fn call_function(&mut self, f: &Object, num_args: usize) -> Result<()> {
+    fn call_closure(&mut self, cl: Object, num_args: usize) -> Result<()> {
+        let Object::Closure { f, .. } = &cl else {
+            return Err("calling non-function".into());
+        };
+
         let &Object::CompiledFunction {
             num_locals,
             num_parameters,
             ..
-        } = f
+        } = f.as_ref()
         else {
             return Err("calling non-function".into());
         };
@@ -259,7 +292,7 @@ impl VM {
             .into());
         }
 
-        let frame = Frame::new(f.clone(), self.sp - num_args);
+        let frame = Frame::new(cl.clone(), self.sp - num_args);
         self.sp = frame.base_pointer + num_locals as usize;
         self.push_frame(frame);
 

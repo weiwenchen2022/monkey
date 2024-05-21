@@ -480,7 +480,7 @@ fn functions() {
                     make!(Opcode::ReturnValue),
                 ]),
             ],
-            expected_instructions: vec![make!(Opcode::Constant, 2), make!(Opcode::Pop)],
+            expected_instructions: vec![make!(Opcode::Closure, 2, 0), make!(Opcode::Pop)],
         },
         CompilerTestCase {
             input: "fn() { 5 + 10 }",
@@ -494,7 +494,7 @@ fn functions() {
                     make!(Opcode::ReturnValue),
                 ]),
             ],
-            expected_instructions: vec![make!(Opcode::Constant, 2), make!(Opcode::Pop)],
+            expected_instructions: vec![make!(Opcode::Closure, 2, 0), make!(Opcode::Pop)],
         },
         CompilerTestCase {
             input: "fn() { 1; 2 }",
@@ -508,7 +508,7 @@ fn functions() {
                     make!(Opcode::ReturnValue),
                 ]),
             ],
-            expected_instructions: vec![make!(Opcode::Constant, 2), make!(Opcode::Pop)],
+            expected_instructions: vec![make!(Opcode::Closure, 2, 0), make!(Opcode::Pop)],
         },
     ];
 
@@ -520,7 +520,7 @@ fn compiler_scopes() {
     let mut comipler = Compiler::new();
     assert_eq!(0, comipler.scope_index);
 
-    let global_symbol_table = &comipler.symbol_table as *const SymbolTable;
+    let global_symbol_table = comipler.symbol_table.as_ptr() as *const SymbolTable;
 
     comipler.emit(Opcode::Mul, &[]);
 
@@ -535,10 +535,16 @@ fn compiler_scopes() {
     let last = &comipler.scopes[comipler.scope_index].last_instruction;
     assert_eq!(Opcode::Sub, last.opcode);
 
-    // assert!(std::ptr::eq(
-    //     global_symbol_table,
-    //     comipler.symbol_table.outer.as_ref().unwrap().as_ref() as *const SymbolTable,
-    // ));
+    assert!(std::ptr::eq(
+        global_symbol_table,
+        comipler
+            .symbol_table
+            .borrow()
+            .outer
+            .as_ref()
+            .unwrap()
+            .as_ptr() as *const SymbolTable,
+    ));
 
     comipler.leave_scope();
 
@@ -546,9 +552,9 @@ fn compiler_scopes() {
 
     assert!(std::ptr::eq(
         global_symbol_table,
-        &comipler.symbol_table as *const SymbolTable
+        comipler.symbol_table.as_ptr() as *const SymbolTable
     ));
-    assert!(comipler.symbol_table.outer.is_none());
+    assert!(comipler.symbol_table.borrow().outer.is_none());
 
     comipler.emit(Opcode::Add, &[]);
 
@@ -566,7 +572,7 @@ fn functions_without_return_value() {
     let tests = &[CompilerTestCase {
         input: "fn() { }",
         expected_constants: vec![Box::new(vec![make!(Opcode::Return)])],
-        expected_instructions: vec![make!(Opcode::Constant, 0), make!(Opcode::Pop)],
+        expected_instructions: vec![make!(Opcode::Closure, 0, 0), make!(Opcode::Pop)],
     }];
     run_compiler_tests!(tests);
 }
@@ -581,7 +587,7 @@ fn function_calls() {
                 Box::new(vec![make!(Opcode::Constant, 0), make!(Opcode::ReturnValue)]),
             ],
             expected_instructions: vec![
-                make!(Opcode::Constant, 1),
+                make!(Opcode::Closure, 1, 0),
                 make!(Opcode::Call, 0),
                 make!(Opcode::Pop),
             ],
@@ -596,7 +602,7 @@ fn function_calls() {
                 Box::new(vec![make!(Opcode::Constant, 0), make!(Opcode::ReturnValue)]),
             ],
             expected_instructions: vec![
-                make!(Opcode::Constant, 1),
+                make!(Opcode::Closure, 1, 0),
                 make!(Opcode::SetGlobal, 0),
                 make!(Opcode::GetGlobal, 0),
                 make!(Opcode::Call, 0),
@@ -613,7 +619,7 @@ fn function_calls() {
                 Box::new(24),
             ],
             expected_instructions: vec![
-                make!(Opcode::Constant, 0),
+                make!(Opcode::Closure, 0, 0),
                 make!(Opcode::SetGlobal, 0),
                 make!(Opcode::GetGlobal, 0),
                 make!(Opcode::Constant, 1),
@@ -621,35 +627,35 @@ fn function_calls() {
                 make!(Opcode::Pop),
             ],
         },
-        // CompilerTestCase {
-        //     input: "
-        // 	let manyArg = fn(a, b, c) { a; b; c };
-        // 	manyArg(24, 25, 26);
-        // 	",
-        //     expected_constants: vec![
-        //         Box::new(vec![
-        //             make!(Opcode::GetLocal, 0),
-        //             make!(Opcode::Pop),
-        //             make!(Opcode::GetLocal, 1),
-        //             make!(Opcode::Pop),
-        //             make!(Opcode::GetLocal, 2),
-        //             make!(Opcode::ReturnValue),
-        //         ]),
-        //         Box::new(24),
-        //         Box::new(25),
-        //         Box::new(26),
-        //     ],
-        //     expected_instructions: vec![
-        //         make!(Opcode::Constant, 0),
-        //         make!(Opcode::SetGlobal, 0),
-        //         make!(Opcode::GetGlobal, 0),
-        //         make!(Opcode::Constant, 1),
-        //         make!(Opcode::Constant, 2),
-        //         make!(Opcode::Constant, 3),
-        //         make!(Opcode::Call, 3),
-        //         make!(Opcode::Pop),
-        //     ],
-        // },
+        CompilerTestCase {
+            input: "
+        	let manyArg = fn(a, b, c) { a; b; c };
+        	manyArg(24, 25, 26);
+        	",
+            expected_constants: vec![
+                Box::new(vec![
+                    make!(Opcode::GetLocal, 0),
+                    make!(Opcode::Pop),
+                    make!(Opcode::GetLocal, 1),
+                    make!(Opcode::Pop),
+                    make!(Opcode::GetLocal, 2),
+                    make!(Opcode::ReturnValue),
+                ]),
+                Box::new(24),
+                Box::new(25),
+                Box::new(26),
+            ],
+            expected_instructions: vec![
+                make!(Opcode::Closure, 0, 0),
+                make!(Opcode::SetGlobal, 0),
+                make!(Opcode::GetGlobal, 0),
+                make!(Opcode::Constant, 1),
+                make!(Opcode::Constant, 2),
+                make!(Opcode::Constant, 3),
+                make!(Opcode::Call, 3),
+                make!(Opcode::Pop),
+            ],
+        },
     ];
 
     run_compiler_tests!(tests);
@@ -673,7 +679,7 @@ fn let_statement_scopes() {
             expected_instructions: vec![
                 make!(Opcode::Constant, 0),
                 make!(Opcode::SetGlobal, 0),
-                make!(Opcode::Constant, 1),
+                make!(Opcode::Closure, 1, 0),
                 make!(Opcode::Pop),
             ],
         },
@@ -693,7 +699,7 @@ fn let_statement_scopes() {
                     make!(Opcode::ReturnValue),
                 ]),
             ],
-            expected_instructions: vec![make!(Opcode::Constant, 1), make!(Opcode::Pop)],
+            expected_instructions: vec![make!(Opcode::Closure, 1, 0), make!(Opcode::Pop)],
         },
         CompilerTestCase {
             input: "
@@ -717,7 +723,7 @@ fn let_statement_scopes() {
                     make!(Opcode::ReturnValue),
                 ]),
             ],
-            expected_instructions: vec![make!(Opcode::Constant, 2), make!(Opcode::Pop)],
+            expected_instructions: vec![make!(Opcode::Closure, 2, 0), make!(Opcode::Pop)],
         },
     ];
 
@@ -753,7 +759,130 @@ fn builtins() {
                 make!(Opcode::Call, 1),
                 make!(Opcode::ReturnValue),
             ])],
-            expected_instructions: vec![make!(Opcode::Constant, 0), make!(Opcode::Pop)],
+            expected_instructions: vec![make!(Opcode::Closure, 0, 0), make!(Opcode::Pop)],
+        },
+    ];
+
+    run_compiler_tests!(tests);
+}
+
+#[test]
+#[ignore = "reason"]
+fn closures() {
+    let tests = &[
+        CompilerTestCase {
+            input: "
+			fn(a) {
+				fn(b) {
+					a + b
+				}
+			}
+			",
+            expected_constants: vec![
+                Box::new(vec![
+                    make!(Opcode::GetFree, 0),
+                    make!(Opcode::GetLocal, 0),
+                    make!(Opcode::Add),
+                    make!(Opcode::ReturnValue),
+                ]),
+                Box::new(vec![
+                    make!(Opcode::GetLocal, 0),
+                    make!(Opcode::Closure, 0, 1),
+                    make!(Opcode::ReturnValue),
+                ]),
+            ],
+            expected_instructions: vec![make!(Opcode::Closure, 1, 0), make!(Opcode::Pop)],
+        },
+        CompilerTestCase {
+            input: "
+			fn(a) {
+				fn(b) {
+					fn(c) {
+						a + b + c
+					}
+				}
+			};
+			",
+            expected_constants: vec![
+                Box::new(vec![
+                    make!(Opcode::GetFree, 0),
+                    make!(Opcode::GetFree, 1),
+                    make!(Opcode::Add),
+                    make!(Opcode::GetLocal, 0),
+                    make!(Opcode::Add),
+                    make!(Opcode::ReturnValue),
+                ]),
+                Box::new(vec![
+                    make!(Opcode::GetFree, 0),
+                    make!(Opcode::GetLocal, 0),
+                    make!(Opcode::Closure, 0, 2),
+                    make!(Opcode::ReturnValue),
+                ]),
+                Box::new(vec![
+                    make!(Opcode::GetLocal, 0),
+                    make!(Opcode::Closure, 1, 1),
+                    make!(Opcode::ReturnValue),
+                ]),
+            ],
+            expected_instructions: vec![make!(Opcode::Closure, 2, 0), make!(Opcode::Pop)],
+        },
+        CompilerTestCase {
+            input: "
+			let global = 55;
+
+			fn() {
+				let a = 66;
+
+				fn() {
+					let b = 77;
+
+					fn() {
+						let c = 88;
+
+						global + a + b + c;
+					}
+				}
+			}
+			",
+            expected_constants: vec![
+                Box::new(55),
+                Box::new(66),
+                Box::new(77),
+                Box::new(88),
+                Box::new(vec![
+                    make!(Opcode::Constant, 3),
+                    make!(Opcode::SetLocal, 0),
+                    make!(Opcode::GetGlobal, 0),
+                    make!(Opcode::GetFree, 0),
+                    make!(Opcode::Add),
+                    make!(Opcode::GetFree, 1),
+                    make!(Opcode::Add),
+                    make!(Opcode::GetLocal, 0),
+                    make!(Opcode::Add),
+                    make!(Opcode::ReturnValue),
+                ]),
+                Box::new(vec![
+                    make!(Opcode::Constant, 2),
+                    make!(Opcode::SetLocal, 0),
+                    make!(Opcode::GetFree, 0),
+                    make!(Opcode::GetLocal, 0),
+                    make!(Opcode::Closure, 4, 2),
+                    make!(Opcode::ReturnValue),
+                ]),
+                Box::new(vec![
+                    make!(Opcode::Constant, 1),
+                    make!(Opcode::SetLocal, 0),
+                    make!(Opcode::GetLocal, 0),
+                    make!(Opcode::Closure, 5, 1),
+                    make!(Opcode::ReturnValue),
+                ]),
+            ],
+            expected_instructions: vec![
+                make!(Opcode::Constant, 0),
+                make!(Opcode::SetGlobal, 0),
+                make!(Opcode::Closure, 6, 0),
+                make!(Opcode::Pop),
+            ],
         },
     ];
 

@@ -2,7 +2,7 @@ use crate::{code::Instructions, object::Object};
 
 #[derive(Clone)]
 pub(crate) struct Frame {
-    pub(crate) f: Object,
+    pub(crate) cl: Object,
     pub(crate) ip: isize,
     pub(crate) base_pointer: usize,
 }
@@ -10,7 +10,7 @@ pub(crate) struct Frame {
 impl Default for Frame {
     fn default() -> Self {
         Self {
-            f: Object::Null,
+            cl: Object::Null,
             ip: -1,
             base_pointer: 0,
         }
@@ -18,17 +18,21 @@ impl Default for Frame {
 }
 
 impl Frame {
-    pub(crate) fn new(f: Object, base_pointer: usize) -> Self {
+    pub(crate) fn new(cl: Object, base_pointer: usize) -> Self {
         Self {
-            f,
+            cl,
             ip: -1,
             base_pointer,
         }
     }
 
     pub(crate) fn instructions(&self) -> &Instructions {
-        if let Object::CompiledFunction { instructions, .. } = &self.f {
-            instructions
+        if let Object::Closure { f, .. } = &self.cl {
+            if let Object::CompiledFunction { instructions, .. } = f.as_ref() {
+                instructions
+            } else {
+                unreachable!();
+            }
         } else {
             unreachable!();
         }

@@ -2,7 +2,9 @@ use crate::ast::{Expression, Node, Statement};
 use crate::code::{self, Instructions, Opcode};
 use crate::object::{self, Object};
 
+use std::cell::RefCell;
 use std::mem;
+use std::rc::Rc;
 
 mod symbol_table;
 pub(crate) use self::symbol_table::SymbolTable;
@@ -36,14 +38,14 @@ struct CompilationScope {
 
 pub struct Compiler {
     pub(crate) constants: Vec<Object>,
-    pub(crate) symbol_table: SymbolTable,
+    pub(crate) symbol_table: Rc<RefCell<SymbolTable>>,
 
     scopes: Vec<CompilationScope>,
     scope_index: usize,
 }
 
 impl Compiler {
-    pub fn new_with_state(s: SymbolTable, constants: Vec<Object>) -> Self {
+    pub fn new_with_state(s: Rc<RefCell<SymbolTable>>, constants: Vec<Object>) -> Self {
         let mut compiler = Self::new();
         compiler.symbol_table = s;
         compiler.constants = constants;
@@ -52,10 +54,10 @@ impl Compiler {
 
     pub fn new() -> Self {
         let main_scope = CompilationScope::default();
-        let mut symbol_table = SymbolTable::new(None);
+        let symbol_table = Rc::new(RefCell::new(SymbolTable::new(None)));
 
         for (i, v) in object::BUILTINS.iter().enumerate() {
-            symbol_table.define_builtin(i, v.0.to_string());
+            symbol_table.borrow_mut().define_builtin(i, v.0.to_string());
         }
 
         Self {
@@ -178,7 +180,7 @@ impl Compiler {
                     panic!("{name:?}");
                 };
 
-                let symbol = self.symbol_table.define(name);
+                let symbol = self.symbol_table.borrow_mut().define(name);
                 if SymbolScope::Global == symbol.scope {
                     self.emit(Opcode::SetGlobal, &[symbol.index as i64]);
                 } else {
@@ -187,7 +189,7 @@ impl Compiler {
             }
 
             Node::Expression(Expression::Identifier { value: name, .. }) => {
-                let Some(symbol) = self.symbol_table.resolve(&name).cloned() else {
+                let Some(symbol) = self.symbol_table.borrow().resolve(&name) else {
                     return Err(format!("undefined variable {name}"));
                 };
 
@@ -236,7 +238,7 @@ impl Compiler {
                     let Expression::Identifier { value: name, .. } = p else {
                         panic!();
                     };
-                    self.symbol_table.define(name);
+                    self.symbol_table.borrow_mut().define(name);
                 });
 
                 self.compile(*body)?;
@@ -249,7 +251,7 @@ impl Compiler {
                     self.emit(Opcode::Return, &[]);
                 }
 
-                let num_locals = self.symbol_table.num_definitions as u8;
+                let num_locals = self.symbol_table.borrow().num_definitions as u8;
                 let instructions = self.leave_scope();
 
                 let compiled_fn = Object::CompiledFunction {
@@ -257,8 +259,8 @@ impl Compiler {
                     num_locals,
                     num_parameters,
                 };
-                let const_index = self.add_constant(compiled_fn);
-                self.emit(Opcode::Constant, &[const_index as i64]);
+                let fn_index = self.add_constant(compiled_fn);
+                self.emit(Opcode::Closure, &[fn_index as i64, 0]);
             }
 
             Node::Statement(Statement::Return { return_value, .. }) => {
@@ -308,14 +310,16 @@ impl Compiler {
         self.scopes.push(CompilationScope::default());
         self.scope_index += 1;
 
-        let outer = std::mem::replace(&mut self.symbol_table, SymbolTable::new(None));
-        self.symbol_table.outer = Some(Box::new(outer));
+        self.symbol_table = Rc::new(RefCell::new(SymbolTable::new(Some(Rc::clone(
+            &self.symbol_table,
+        )))));
     }
 
     fn leave_scope(&mut self) -> Instructions {
         let scope = self.scopes.pop().unwrap();
         self.scope_index -= 1;
-        self.symbol_table = *(self.symbol_table.outer.take().unwrap());
+        let outer = self.symbol_table.borrow_mut().outer.take().unwrap();
+        self.symbol_table = outer;
         scope.instructions
     }
 

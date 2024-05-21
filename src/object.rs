@@ -43,6 +43,11 @@ pub enum Object {
         num_locals: u8,
         num_parameters: u8,
     },
+
+    Closure {
+        f: Box<Object>,
+        free: Vec<Object>,
+    },
 }
 
 impl From<HashMap<Object, Object>> for Object {
@@ -94,6 +99,7 @@ pub const HASH: &str = "hash";
 pub const QUOTE: &str = "quote";
 pub const MARCO: &str = "macro";
 pub const COMPILED_FUNCTION: &str = "compiled_function";
+pub const CLOSURE: &str = "closure";
 
 impl Object {
     pub fn ty(&self) -> &'static str {
@@ -111,6 +117,7 @@ impl Object {
             Object::Quote(_) => QUOTE,
             Object::Macro { .. } => MARCO,
             Object::CompiledFunction { .. } => COMPILED_FUNCTION,
+            Object::Closure { .. } => CLOSURE,
         }
     }
 
@@ -191,6 +198,7 @@ impl Display for Object {
             }
 
             Object::CompiledFunction { .. } => write!(f, "compiled function [{:p}]", self),
+            Object::Closure { .. } => write!(f, "clsure [{:p}]", self),
         }
     }
 }

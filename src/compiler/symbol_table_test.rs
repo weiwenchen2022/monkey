@@ -1,5 +1,5 @@
 use super::symbol_table::{Symbol, SymbolScope, SymbolTable};
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 #[test]
 fn define() {
@@ -7,7 +7,7 @@ fn define() {
         (
             "a".to_string(),
             Symbol {
-                name: "a".to_string(),
+                name: Rc::new("a".to_string()),
                 scope: SymbolScope::Global,
                 index: 0,
             },
@@ -15,7 +15,7 @@ fn define() {
         (
             "b".to_string(),
             Symbol {
-                name: "b".to_string(),
+                name: Rc::new("b".to_string()),
                 scope: SymbolScope::Global,
                 index: 1,
             },
@@ -23,7 +23,7 @@ fn define() {
         (
             "c".to_string(),
             Symbol {
-                name: "c".to_string(),
+                name: Rc::new("c".to_string()),
                 scope: SymbolScope::Local,
                 index: 0,
             },
@@ -31,7 +31,7 @@ fn define() {
         (
             "d".to_string(),
             Symbol {
-                name: "d".to_string(),
+                name: Rc::new("d".to_string()),
                 scope: SymbolScope::Local,
                 index: 1,
             },
@@ -39,7 +39,7 @@ fn define() {
         (
             "e".to_string(),
             Symbol {
-                name: "e".to_string(),
+                name: Rc::new("e".to_string()),
                 scope: SymbolScope::Local,
                 index: 0,
             },
@@ -47,7 +47,7 @@ fn define() {
         (
             "f".to_string(),
             Symbol {
-                name: "f".to_string(),
+                name: Rc::new("f".to_string()),
                 scope: SymbolScope::Local,
                 index: 1,
             },
@@ -56,21 +56,21 @@ fn define() {
     .into_iter()
     .collect();
 
-    let mut gobal = SymbolTable::new(None);
+    let gobal = Rc::new(RefCell::new(SymbolTable::new(None)));
 
-    let a = gobal.define("a".to_string());
+    let a = gobal.borrow_mut().define("a".to_string());
     assert_eq!(expected["a"], a);
 
-    let b = gobal.define("b".to_string());
+    let b = gobal.borrow_mut().define("b".to_string());
     assert_eq!(expected["b"], b);
 
-    let mut first_local = SymbolTable::new(Some(Box::new(gobal)));
-    let c = first_local.define("c".to_string());
+    let first_local = Rc::new(RefCell::new(SymbolTable::new(Some(gobal))));
+    let c = first_local.borrow_mut().define("c".to_string());
     assert_eq!(expected["c"], c);
-    let d = first_local.define("d".to_string());
+    let d = first_local.borrow_mut().define("d".to_string());
     assert_eq!(expected["d"], d);
 
-    let mut second_local = SymbolTable::new(Some(Box::new(first_local)));
+    let mut second_local = SymbolTable::new(Some(first_local));
     let e = second_local.define("e".to_string());
     assert_eq!(expected["e"], e);
     let f = second_local.define("f".to_string());
@@ -87,7 +87,7 @@ fn resolve_global() {
         (
             "a".to_string(),
             Symbol {
-                name: "a".to_string(),
+                name: Rc::new("a".to_string()),
                 scope: SymbolScope::Global,
                 index: 0,
             },
@@ -95,7 +95,7 @@ fn resolve_global() {
         (
             "b".to_string(),
             Symbol {
-                name: "b".to_string(),
+                name: Rc::new("b".to_string()),
                 scope: SymbolScope::Global,
                 index: 1,
             },
@@ -106,38 +106,38 @@ fn resolve_global() {
 
     for sym in expected.values() {
         let result = global.resolve(&sym.name).unwrap();
-        assert_eq!(sym, result);
+        assert_eq!(sym, &result);
     }
 }
 
 #[test]
 fn resolve_local() {
-    let mut global = SymbolTable::new(None);
-    global.define("a".to_string());
-    global.define("b".to_string());
+    let global = Rc::new(RefCell::new(SymbolTable::new(None)));
+    global.borrow_mut().define("a".to_string());
+    global.borrow_mut().define("b".to_string());
 
-    let mut local = SymbolTable::new(Some(Box::new(global)));
+    let mut local = SymbolTable::new(Some(global));
     local.define("c".to_string());
     local.define("d".to_string());
 
     let expected = &[
         Symbol {
-            name: "a".to_string(),
+            name: Rc::new("a".to_string()),
             scope: SymbolScope::Global,
             index: 0,
         },
         Symbol {
-            name: "b".to_string(),
+            name: Rc::new("b".to_string()),
             scope: SymbolScope::Global,
             index: 1,
         },
         Symbol {
-            name: "c".to_string(),
+            name: Rc::new("c".to_string()),
             scope: SymbolScope::Local,
             index: 0,
         },
         Symbol {
-            name: "d".to_string(),
+            name: Rc::new("d".to_string()),
             scope: SymbolScope::Local,
             index: 1,
         },
@@ -145,75 +145,77 @@ fn resolve_local() {
 
     for sym in expected {
         let result = local.resolve(&sym.name).unwrap();
-        assert_eq!(sym, result);
+        assert_eq!(sym, &result);
     }
 }
 
 #[test]
 fn resolve_nested_local() {
-    let mut global = SymbolTable::new(None);
-    global.define("a".to_string());
-    global.define("b".to_string());
+    let global = Rc::new(RefCell::new(SymbolTable::new(None)));
+    global.borrow_mut().define("a".to_string());
+    global.borrow_mut().define("b".to_string());
 
-    let mut first_local = SymbolTable::new(Some(Box::new(global)));
-    first_local.define("c".to_string());
-    first_local.define("d".to_string());
+    let first_local = Rc::new(RefCell::new(SymbolTable::new(Some(global))));
+    first_local.borrow_mut().define("c".to_string());
+    first_local.borrow_mut().define("d".to_string());
 
-    let mut second_local = SymbolTable::new(Some(Box::new(first_local)));
-    second_local.define("e".to_string());
-    second_local.define("f".to_string());
+    let second_local = Rc::new(RefCell::new(SymbolTable::new(Some(Rc::clone(
+        &first_local,
+    )))));
+    second_local.borrow_mut().define("e".to_string());
+    second_local.borrow_mut().define("f".to_string());
 
     struct Test<'a> {
-        table: &'a SymbolTable,
+        table: Rc<RefCell<SymbolTable>>,
         expected_symbols: &'a [Symbol],
     }
 
     let tests = &[
         Test {
-            table: second_local.outer.as_ref().unwrap(),
+            table: first_local,
             expected_symbols: &[
                 Symbol {
-                    name: "a".to_string(),
+                    name: Rc::new("a".to_string()),
                     scope: SymbolScope::Global,
                     index: 0,
                 },
                 Symbol {
-                    name: "b".to_string(),
+                    name: Rc::new("b".to_string()),
                     scope: SymbolScope::Global,
                     index: 1,
                 },
                 Symbol {
-                    name: "c".to_string(),
+                    name: Rc::new("c".to_string()),
                     scope: SymbolScope::Local,
                     index: 0,
                 },
                 Symbol {
-                    name: "d".to_string(),
+                    name: Rc::new("d".to_string()),
                     scope: SymbolScope::Local,
                     index: 1,
                 },
             ],
         },
         Test {
-            table: &second_local,
+            table: second_local,
             expected_symbols: &[
                 Symbol {
-                    name: "a".to_string(),
+                    name: Rc::new("a".to_string()),
                     scope: SymbolScope::Global,
                     index: 0,
                 },
                 Symbol {
-                    name: "b".to_string(),
+                    name: Rc::new("b".to_string()),
                     scope: SymbolScope::Global,
                     index: 1,
                 },
                 Symbol {
-                    name: "e".to_string(),
+                    name: Rc::new("e".to_string()),
                     scope: SymbolScope::Local,
                     index: 0,
                 },
                 Symbol {
-                    name: "f".to_string(),
+                    name: Rc::new("f".to_string()),
                     scope: SymbolScope::Local,
                     index: 1,
                 },
@@ -223,56 +225,109 @@ fn resolve_nested_local() {
 
     for tt in tests {
         for sym in tt.expected_symbols {
-            let result = tt.table.resolve(&sym.name).unwrap();
-            assert_eq!(sym, result);
+            let result = tt.table.borrow().resolve(&sym.name).unwrap();
+            assert_eq!(sym, &result);
         }
     }
 }
 
 #[test]
 fn define_resolve_builtins() {
+    let global = Rc::new(RefCell::new(SymbolTable::new(None)));
+    let first_local = Rc::new(RefCell::new(SymbolTable::new(Some(Rc::clone(&global)))));
+    let second_local = Rc::new(RefCell::new(SymbolTable::new(Some(Rc::clone(
+        &first_local,
+    )))));
+
     let expected = &[
         Symbol {
-            name: "a".to_string(),
+            name: Rc::new("a".to_string()),
             scope: SymbolScope::Builtin,
             index: 0,
         },
         Symbol {
-            name: "d".to_string(),
+            name: Rc::new("d".to_string()),
             scope: SymbolScope::Builtin,
             index: 1,
         },
         Symbol {
-            name: "e".to_string(),
+            name: Rc::new("e".to_string()),
             scope: SymbolScope::Builtin,
             index: 2,
         },
         Symbol {
-            name: "f".to_string(),
+            name: Rc::new("f".to_string()),
             scope: SymbolScope::Builtin,
             index: 3,
         },
     ];
 
-    let mut global = SymbolTable::new(None);
     for (i, sym) in expected.iter().enumerate() {
-        global.define_builtin(i, sym.name.clone());
+        global
+            .borrow_mut()
+            .define_builtin(i, sym.name.as_ref().clone());
     }
 
-    for sym in expected {
-        let result = global.resolve(&sym.name).unwrap();
-        assert_eq!(sym, result);
+    for table in [global, first_local, second_local] {
+        for sym in expected {
+            let result = table.borrow().resolve(&sym.name).unwrap();
+            assert_eq!(sym, &result);
+        }
     }
+}
 
-    let first_local = SymbolTable::new(Some(Box::new(global)));
-    for sym in expected {
-        let result = first_local.resolve(&sym.name).unwrap();
-        assert_eq!(sym, result);
-    }
+#[test]
+fn resolve_free() {
+    let global = Rc::new(RefCell::new(SymbolTable::new(None)));
+    global.borrow_mut().define("a".to_string());
+    global.borrow_mut().define("b".to_string());
 
-    let second_local = SymbolTable::new(Some(Box::new(first_local)));
-    for sym in expected {
-        let result = second_local.resolve(&sym.name).unwrap();
-        assert_eq!(sym, result);
+    let first_local = Rc::new(RefCell::new(SymbolTable::new(Some(global))));
+    first_local.borrow_mut().define("c".to_string());
+    first_local.borrow_mut().define("d".to_string());
+
+    let mut second_local = SymbolTable::new(Some(first_local));
+    second_local.define("e".to_string());
+    second_local.define("f".to_string());
+
+    struct Test {
+        table: Rc<SymbolTable>,
+        expected_symbols: Vec<Symbol>,
+        expected_free_symbols: Vec<Symbol>,
     }
+    // let tests = &[Test {
+    //     table: firstLocal,
+    //     expected_symbols: vec![
+    //         Symbol {
+    //             name: "a".to_string(),
+    //             scope: SymbolScope::Global,
+    //             index: 0,
+    //         },
+    //         Symbol {
+    //             name: "b".to_string(),
+    //             scope: SymbolScope::Global,
+    //             index: 1,
+    //         },
+    //         Symbol {
+    //             name: "c".to_string(),
+    //             scope: SymbolScope::Local,
+    //             index: 0,
+    //         },
+    //         Symbol {
+    //             name: "d".to_string(),
+    //             scope: SymbolScope::Local,
+    //             index: 1,
+    //         },
+    //     ],
+    //     expected_free_symbols: vec![],
+    // }];
+
+    // for tt in tests {
+    //     for sym in &tt.expected_symbols {
+    //         let result = tt.table.resolve(&sym.name).unwrap();
+    //         assert_eq!(sym, result);
+    //     }
+
+    //     assert_eq!(tt.expected_free_symbols.len(), )
+    // }
 }
