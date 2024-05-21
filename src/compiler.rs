@@ -1,12 +1,12 @@
 use crate::ast::{Expression, Node, Statement};
 use crate::code::{self, Instructions, Opcode};
-use crate::object::Object;
+use crate::object::{self, Object};
 
 use std::mem;
 
 mod symbol_table;
-use self::symbol_table::SymbolScope;
 pub(crate) use self::symbol_table::SymbolTable;
+use self::symbol_table::{Symbol, SymbolScope};
 
 pub struct Bytecode {
     pub(crate) instructions: Instructions,
@@ -52,9 +52,15 @@ impl Compiler {
 
     pub fn new() -> Self {
         let main_scope = CompilationScope::default();
+        let mut symbol_table = SymbolTable::new(None);
+
+        for (i, v) in object::BUILTINS.iter().enumerate() {
+            symbol_table.define_builtin(i, v.0.to_string());
+        }
+
         Self {
             constants: Vec::new(),
-            symbol_table: SymbolTable::new(None),
+            symbol_table,
 
             scopes: vec![main_scope],
             scope_index: 0,
@@ -181,19 +187,15 @@ impl Compiler {
             }
 
             Node::Expression(Expression::Identifier { value: name, .. }) => {
-                let Some(symbol) = self.symbol_table.resolve(&name) else {
+                let Some(symbol) = self.symbol_table.resolve(&name).cloned() else {
                     return Err(format!("undefined variable {name}"));
                 };
 
-                if SymbolScope::Global == symbol.scope {
-                    self.emit(Opcode::GetGlobal, &[symbol.index as i64]);
-                } else {
-                    self.emit(Opcode::GetLocal, &[symbol.index as i64]);
-                }
+                self.load_symbol(&symbol);
             }
 
             Node::Expression(Expression::StringLiteral { value, .. }) => {
-                let const_index = self.add_constant(Object::String(value));
+                let const_index = self.add_constant(value);
                 self.emit(Opcode::Constant, &[const_index as i64]);
             }
 
@@ -281,6 +283,14 @@ impl Compiler {
         Ok(())
     }
 
+    fn load_symbol(&mut self, s: &Symbol) {
+        match s.scope {
+            SymbolScope::Global => self.emit(Opcode::GetGlobal, &[s.index as i64]),
+            SymbolScope::Local => self.emit(Opcode::GetLocal, &[s.index as i64]),
+            SymbolScope::Builtin => self.emit(Opcode::GetBuiltin, &[s.index as i64]),
+        };
+    }
+
     fn replace_last_pop_with_return(&mut self) {
         let last_pos = self.scopes[self.scope_index].last_instruction.position;
         self.replace_instruction(last_pos, make!(Opcode::ReturnValue).into());
@@ -309,8 +319,8 @@ impl Compiler {
         scope.instructions
     }
 
-    fn add_constant(&mut self, obj: Object) -> usize {
-        self.constants.push(obj);
+    fn add_constant<O: Into<Object>>(&mut self, obj: O) -> usize {
+        self.constants.push(obj.into());
         self.constants.len() - 1
     }
 

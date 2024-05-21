@@ -9,6 +9,7 @@ use crate::parser::Parser;
 use super::Compiler;
 
 use std::any::Any;
+use std::ops::Deref;
 use std::vec;
 
 struct CompilerTestCase<'a> {
@@ -723,6 +724,42 @@ fn let_statement_scopes() {
     run_compiler_tests!(tests);
 }
 
+#[test]
+fn builtins() {
+    let tests = &[
+        CompilerTestCase {
+            input: "
+			len([]);
+			push([], 1);
+			",
+            expected_constants: vec![Box::new(1)],
+            expected_instructions: vec![
+                make!(Opcode::GetBuiltin, 0),
+                make!(Opcode::Array, 0),
+                make!(Opcode::Call, 1),
+                make!(Opcode::Pop),
+                make!(Opcode::GetBuiltin, 5),
+                make!(Opcode::Array, 0),
+                make!(Opcode::Constant, 0),
+                make!(Opcode::Call, 2),
+                make!(Opcode::Pop),
+            ],
+        },
+        CompilerTestCase {
+            input: "fn() { len([]) }",
+            expected_constants: vec![Box::new(vec![
+                make!(Opcode::GetBuiltin, 0),
+                make!(Opcode::Array, 0),
+                make!(Opcode::Call, 1),
+                make!(Opcode::ReturnValue),
+            ])],
+            expected_instructions: vec![make!(Opcode::Constant, 0), make!(Opcode::Pop)],
+        },
+    ];
+
+    run_compiler_tests!(tests);
+}
+
 fn parse(input: &str) -> Program {
     let l = Lexer::new(input.as_bytes());
     let mut p = Parser::new(l);
@@ -774,5 +811,5 @@ fn test_string_object(expected: &str, actual: &Object) {
     let Object::String(actual) = actual else {
         panic!("object is not String. got={}", actual.ty());
     };
-    assert_eq!(expected, actual);
+    assert_eq!(expected, actual.deref());
 }

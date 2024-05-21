@@ -228,3 +228,51 @@ fn resolve_nested_local() {
         }
     }
 }
+
+#[test]
+fn define_resolve_builtins() {
+    let expected = &[
+        Symbol {
+            name: "a".to_string(),
+            scope: SymbolScope::Builtin,
+            index: 0,
+        },
+        Symbol {
+            name: "d".to_string(),
+            scope: SymbolScope::Builtin,
+            index: 1,
+        },
+        Symbol {
+            name: "e".to_string(),
+            scope: SymbolScope::Builtin,
+            index: 2,
+        },
+        Symbol {
+            name: "f".to_string(),
+            scope: SymbolScope::Builtin,
+            index: 3,
+        },
+    ];
+
+    let mut global = SymbolTable::new(None);
+    for (i, sym) in expected.iter().enumerate() {
+        global.define_builtin(i, sym.name.clone());
+    }
+
+    for sym in expected {
+        let result = global.resolve(&sym.name).unwrap();
+        assert_eq!(sym, result);
+    }
+
+    let first_local = SymbolTable::new(Some(Box::new(global)));
+    for sym in expected {
+        let result = first_local.resolve(&sym.name).unwrap();
+        assert_eq!(sym, result);
+    }
+
+    let second_local = SymbolTable::new(Some(Box::new(first_local)));
+    for sym in expected {
+        let result = second_local.resolve(&sym.name).unwrap();
+        assert_eq!(sym, result);
+    }
+}

@@ -1,6 +1,6 @@
 use crate::code::{self, Instructions, Opcode};
 use crate::compiler::Bytecode;
-use crate::object::Object;
+use crate::object::{self, Object};
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -188,7 +188,7 @@ impl VM {
                     let num_args = code::read_u8(&ins[ip + 1..]);
                     self.current_frame().ip += 1;
 
-                    self.call_function(num_args as usize)?;
+                    self.execute_call(num_args as usize)?;
                 }
                 Opcode::ReturnValue => {
                     let return_value = self.pop();
@@ -219,13 +219,29 @@ impl VM {
                     let base_pointer = self.current_frame().base_pointer;
                     self.push(self.stack[base_pointer + local_index as usize].clone())?;
                 }
+
+                Opcode::GetBuiltin => {
+                    let builtin_index = code::read_u8(&ins[ip + 1..]);
+                    self.current_frame().ip += 1;
+
+                    let definition = object::BUILTINS[builtin_index as usize];
+                    self.push(Object::Builtin(definition.1))?;
+                }
             }
         }
         Ok(())
     }
 
-    fn call_function(&mut self, num_args: usize) -> Result<()> {
-        let f = &self.stack[self.sp - 1 - num_args];
+    fn execute_call(&mut self, num_args: usize) -> Result<()> {
+        let callee = self.stack[self.sp - 1 - num_args].clone();
+        match callee {
+            Object::CompiledFunction { .. } => self.call_function(&callee, num_args),
+            Object::Builtin(_) => self.call_builtin(&callee, num_args),
+            _ => Err("calling non-function and non-built-in".into()),
+        }
+    }
+
+    fn call_function(&mut self, f: &Object, num_args: usize) -> Result<()> {
         let &Object::CompiledFunction {
             num_locals,
             num_parameters,
@@ -248,6 +264,23 @@ impl VM {
         self.push_frame(frame);
 
         Ok(())
+    }
+
+    fn call_builtin(&mut self, builtin: &Object, num_args: usize) -> Result<()> {
+        let args = self.stack[self.sp - num_args..self.sp].iter_mut().fold(
+            Vec::with_capacity(num_args),
+            |mut args, arg| {
+                args.push(std::mem::replace(arg, Object::Null));
+                args
+            },
+        );
+
+        let Object::Builtin(f) = builtin else {
+            unreachable!();
+        };
+        let result = f(args).unwrap_or_else(Object::Error);
+        self.sp = self.sp - num_args - 1;
+        self.push(result)
     }
 
     fn execute_index_expression(&mut self, left: Object, index: Object) -> Result<()> {
@@ -295,7 +328,7 @@ impl VM {
             hashed.insert(key, value);
         }
 
-        Ok(Object::Hash(hashed))
+        Ok(hashed.into())
     }
 
     fn build_array(&mut self, start_index: usize, end_index: usize) -> Object {
@@ -303,7 +336,7 @@ impl VM {
         for i in start_index..end_index {
             elements.push(std::mem::replace(&mut self.stack[i], Object::Null));
         }
-        Object::Array(elements)
+        Object::Array(elements.into())
     }
 
     fn execute_minus_operator(&mut self) -> Result<()> {

@@ -2,6 +2,7 @@
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use crate::ast::{Expression, Node, Program, Statement};
 use crate::environment::Environment;
@@ -144,11 +145,11 @@ impl Evaluator for Expression {
                 apply_function(function, args)
             }
 
-            Expression::StringLiteral { value, .. } => Ok(Object::String(value)),
+            Expression::StringLiteral { value, .. } => Ok(value.into()),
 
             Expression::ArrayLiteral { elements, .. } => {
                 let elements = eval_expressions(elements, env)?;
-                Ok(Object::Array(elements))
+                Ok(elements.into())
             }
 
             Expression::Index { left, index, .. } => {
@@ -178,7 +179,7 @@ fn eval_hash_literal(nodes: HashMap<Expression, Expression>, env: Environment) -
         pairs.insert(key, value);
     }
 
-    Ok(Object::Hash(pairs))
+    Ok(pairs.into())
 }
 
 fn eval_index_expression(left: Object, index: Object) -> Result<Object> {

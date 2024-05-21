@@ -4,6 +4,7 @@ use std::collections::HashMap;
 pub(crate) enum SymbolScope {
     Local,
     Global,
+    Builtin,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -55,5 +56,15 @@ impl SymbolTable {
         } else {
             None
         }
+    }
+
+    pub(crate) fn define_builtin(&mut self, index: usize, name: String) -> Symbol {
+        let symbol = Symbol {
+            name: name.clone(),
+            scope: SymbolScope::Builtin,
+            index,
+        };
+        self.store.insert(name, symbol.clone());
+        symbol
     }
 }

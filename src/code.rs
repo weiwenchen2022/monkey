@@ -116,6 +116,8 @@ pub(crate) enum Opcode {
 
     GetLocal,
     SetLocal,
+
+    GetBuiltin,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -319,6 +321,13 @@ lazy_static! {
                 Opcode::SetLocal,
                 Definition {
                     name: "OpSetLocal",
+                    operand_widths: &[1],
+                },
+            ),
+            (
+                Opcode::GetBuiltin,
+                Definition {
+                    name: "OpGetBuiltin",
                     operand_widths: &[1],
                 },
             ),

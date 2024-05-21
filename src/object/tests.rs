@@ -1,12 +1,13 @@
 use super::Object;
 use fnv::FnvBuildHasher;
+use std::rc::Rc;
 
 #[test]
 fn string_hashkey() {
-    let hello1 = Object::String("Hello World".to_string());
-    let hello2 = Object::String("Hello World".to_string());
-    let diff1 = Object::String("My name is johnny".to_string());
-    let diff2 = Object::String("My name is johnny".to_string());
+    let hello1: Object = "Hello World".into();
+    let hello2: Object = "Hello World".into();
+    let diff1: Object = "My name is johnny".into();
+    let diff2: Object = "My name is johnny".into();
 
     let builder = FnvBuildHasher::default();
     assert_eq!(

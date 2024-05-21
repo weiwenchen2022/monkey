@@ -3,7 +3,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 
 use crate::compiler::{Compiler, SymbolTable};
 use crate::lexer::Lexer;
-use crate::object::Object;
+use crate::object::{self, Object};
 use crate::parser::Parser;
 use crate::vm::{self, VM};
 
@@ -15,6 +15,10 @@ pub fn start<R: Read, W: Write>(input: R, mut output: W) -> Result<(), Box<dyn E
     let mut constants = Vec::new();
     let mut globals = vec![Object::Null; vm::GLOBALS_SIZE];
     let mut symbol_table = SymbolTable::new(None);
+
+    for (i, v) in object::BUILTINS.iter().enumerate() {
+        symbol_table.define_builtin(i, v.0.to_string());
+    }
 
     loop {
         write!(&mut output, "{}", PROMT)?;

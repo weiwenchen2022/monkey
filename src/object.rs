@@ -1,5 +1,9 @@
 use std::collections::HashMap;
 use std::fmt::{self, Display};
+use std::rc::Rc;
+
+mod builtins;
+pub(crate) use builtins::{get_builtin_function_by_name, BUILTINS};
 
 #[macro_export]
 macro_rules! error {
@@ -22,10 +26,10 @@ pub enum Object {
         body: Statement,
         env: Environment,
     },
-    String(String),
+    String(Rc<String>),
     Builtin(BuiltinFunction),
-    Array(Vec<Object>),
-    Hash(HashMap<Object, Object>),
+    Array(Rc<Vec<Object>>),
+    Hash(Rc<HashMap<Object, Object>>),
     Quote(Node),
 
     Macro {
@@ -39,6 +43,30 @@ pub enum Object {
         num_locals: u8,
         num_parameters: u8,
     },
+}
+
+impl From<HashMap<Object, Object>> for Object {
+    fn from(pairs: HashMap<Object, Object>) -> Self {
+        Object::Hash(Rc::new(pairs))
+    }
+}
+
+impl From<Vec<Object>> for Object {
+    fn from(elements: Vec<Object>) -> Self {
+        Object::Array(Rc::new(elements))
+    }
+}
+
+impl From<&str> for Object {
+    fn from(s: &str) -> Self {
+        s.to_string().into()
+    }
+}
+
+impl From<String> for Object {
+    fn from(s: String) -> Self {
+        Object::String(Rc::new(s))
+    }
 }
 
 impl From<bool> for Object {
@@ -210,7 +238,10 @@ impl Add for Object {
                 Ok(Object::Integer(left_val + right_val))
             }
             (Object::String(left_val), Object::String(right_val)) => {
-                Ok(Object::String(left_val.clone() + right_val))
+                let mut result = String::with_capacity(left_val.len() + right_val.len());
+                result.push_str(left_val);
+                result.push_str(right_val);
+                Ok(result.into())
             }
             _ => error!("unknown operator: {} + {}", self.ty(), rhs.ty()),
         }

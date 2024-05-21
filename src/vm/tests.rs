@@ -8,6 +8,7 @@ use super::VM;
 
 use std::any::Any;
 use std::collections::HashMap;
+use std::ops::Deref;
 
 struct VmTestCase<'a> {
     input: &'a str,
@@ -659,6 +660,96 @@ fn calling_functions_with_wrong_arguments() {
     }
 }
 
+#[test]
+fn builtin_functions() {
+    let tests = &[
+        VmTestCase {
+            input: r#"len("")"#,
+            expected: Box::new(0),
+        },
+        VmTestCase {
+            input: r#"len("four")"#,
+            expected: Box::new(4),
+        },
+        VmTestCase {
+            input: r#"len("hello world")"#,
+            expected: Box::new(11),
+        },
+        VmTestCase {
+            input: "len(1)",
+            expected: Box::new(Object::Error(
+                "argument to `len` not supported, got integer".to_string(),
+            )),
+        },
+        VmTestCase {
+            input: r#"len("one", "two")"#,
+            expected: Box::new(Object::Error(
+                "wrong number of arguments. got=2, want=1".to_string(),
+            )),
+        },
+        VmTestCase {
+            input: "len([1, 2, 3])",
+            expected: Box::new(3),
+        },
+        VmTestCase {
+            input: "len([])",
+            expected: Box::new(0),
+        },
+        VmTestCase {
+            input: r#"puts("hello", "world!")"#,
+            expected: Box::new(()),
+        },
+        VmTestCase {
+            input: "first([1, 2, 3])",
+            expected: Box::new(1),
+        },
+        VmTestCase {
+            input: "first([])",
+            expected: Box::new(()),
+        },
+        VmTestCase {
+            input: "first(1)",
+            expected: Box::new(Object::Error(
+                "argument to `first` must be array, got integer".to_string(),
+            )),
+        },
+        VmTestCase {
+            input: "last([1, 2, 3])",
+            expected: Box::new(3),
+        },
+        VmTestCase {
+            input: "last([])",
+            expected: Box::new(()),
+        },
+        VmTestCase {
+            input: "last(1)",
+            expected: Box::new(Object::Error(
+                "argument to `last` must be array, got integer".to_string(),
+            )),
+        },
+        VmTestCase {
+            input: "rest([1, 2, 3])",
+            expected: Box::new(&[2, 3] as &[i32]),
+        },
+        VmTestCase {
+            input: "rest([])",
+            expected: Box::new(()),
+        },
+        VmTestCase {
+            input: "push([], 1)",
+            expected: Box::new(&[1] as &[i32]),
+        },
+        VmTestCase {
+            input: "push(1, 1)",
+            expected: Box::new(Object::Error(
+                "argument to `push` must be array, got integer".to_string(),
+            )),
+        },
+    ];
+
+    run_vm_tests!(tests);
+}
+
 fn parse(input: &str) -> Program {
     let l = Lexer::new(input.as_bytes());
     let mut p = Parser::new(l);
@@ -698,6 +789,12 @@ fn test_expected_object(expected: &Box<dyn Any>, actual: &Object) {
 
             test_integer_object(expected_value, actual_value);
         }
+    } else if let Some(Object::Error(expected)) = expected.downcast_ref::<Object>() {
+        let Object::Error(actual) = actual else {
+            panic!("object is not Error: {}", actual.ty());
+        };
+
+        assert_eq!(expected, actual);
     } else {
         panic!("type_id {:?}", expected.as_ref().type_id());
     }
@@ -721,5 +818,5 @@ fn test_string_object(expected: &str, actual: &Object) {
     let Object::String(actual) = actual else {
         panic!("object is not String. got={}", actual.ty());
     };
-    assert_eq!(expected, actual);
+    assert_eq!(expected, actual.deref());
 }

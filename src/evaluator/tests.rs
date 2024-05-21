@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 
 use super::Evaluator;
 use crate::{environment::Environment, lexer::Lexer, object::Object, parser::Parser};
@@ -75,7 +75,7 @@ fn eval_integer_expression() {
 
     for tt in tests {
         let evaluated = test_eval(tt.input);
-        test_integer_object(evaluated, tt.expected);
+        test_integer_object(&evaluated, tt.expected);
     }
 }
 
@@ -237,7 +237,7 @@ fn if_else_expression() {
     for tt in tests {
         let evaluated = test_eval(tt.input);
         if let Some(integer) = tt.expected {
-            test_integer_object(evaluated, integer);
+            test_integer_object(&evaluated, integer);
         } else {
             test_null_object(evaluated);
         }
@@ -279,7 +279,7 @@ if (10 > 1) {
 
     for tt in tests {
         let evaluated = test_eval(tt.input);
-        test_integer_object(evaluated, tt.expected);
+        test_integer_object(&evaluated, tt.expected);
     }
 }
 
@@ -375,7 +375,7 @@ fn let_statements() {
     ];
 
     for tt in tests {
-        test_integer_object(test_eval(tt.input), tt.expected);
+        test_integer_object(&test_eval(tt.input), tt.expected);
     }
 }
 
@@ -428,7 +428,7 @@ fn function_application() {
     ];
 
     for tt in tests {
-        test_integer_object(test_eval(tt.input), tt.expected);
+        test_integer_object(&test_eval(tt.input), tt.expected);
     }
 }
 
@@ -447,7 +447,7 @@ let ourFunction = fn(first) {
 
 ourFunction(20) + first + second;";
 
-    test_integer_object(test_eval(input), 70);
+    test_integer_object(&test_eval(input), 70);
 }
 
 #[test]
@@ -461,7 +461,7 @@ let add_two = new_adder(2);
 add_two(2);
 ";
 
-    test_integer_object(test_eval(input), 4);
+    test_integer_object(&test_eval(input), 4);
 }
 
 #[test]
@@ -471,7 +471,7 @@ fn string_literal() {
     let Object::String(s) = evaluated else {
         panic!("object is not String. got {}", evaluated.ty());
     };
-    assert_eq!("Hello World!", s);
+    assert_eq!("Hello World!", s.deref());
 }
 
 #[test]
@@ -481,7 +481,7 @@ fn string_concatenation() {
     let Object::String(s) = evaluated else {
         panic!("object is not String. got {}", evaluated.ty());
     };
-    assert_eq!("Hello World!", s);
+    assert_eq!("Hello World!", s.deref());
 }
 
 #[test]
@@ -568,9 +568,9 @@ fn builtin_functions() {
 
         if let Some(expected) = &tt.expected {
             if let Some(expected) = expected.downcast_ref::<i32>() {
-                test_integer_object(evaluated, *expected as i64);
+                test_integer_object(&evaluated, *expected as i64);
             } else if let Some(expected) = expected.downcast_ref::<i64>() {
-                test_integer_object(evaluated, *expected);
+                test_integer_object(&evaluated, *expected);
             } else if let Some(expected) = expected.downcast_ref::<&str>() {
                 let Object::Error(err) = evaluated else {
                     panic!("object is not Error. got= {}", evaluated.ty());
@@ -582,16 +582,13 @@ fn builtin_functions() {
                 };
                 assert_eq!(expected, &err);
             } else if let Some(expected) = expected.downcast_ref::<Vec<i32>>() {
-                let Object::Array(mut elements) = evaluated else {
+                let Object::Array(elements) = evaluated else {
                     panic!("obj not Array. got={}", evaluated.ty());
                 };
 
                 assert_eq!(expected.len(), elements.len());
                 for (i, expected_elem) in expected.iter().enumerate() {
-                    test_integer_object(
-                        std::mem::replace(&mut elements[i], Object::Null),
-                        *expected_elem as i64,
-                    );
+                    test_integer_object(&elements[i], *expected_elem as i64);
                 }
             } else {
                 panic!("typeid {:?}", expected.as_ref().type_id());
@@ -607,15 +604,15 @@ fn array_literals() {
     let input = "[1, 2 * 2, 3 + 3]";
 
     let evaluated = test_eval(input);
-    let Object::Array(mut elements) = evaluated else {
+    let Object::Array(elements) = evaluated else {
         panic!("object is not Array. got {}", evaluated.ty());
     };
     assert_eq!(3, elements.len());
 
     use std::mem;
-    test_integer_object(mem::replace(&mut elements[0], Object::Null), 1);
-    test_integer_object(mem::replace(&mut elements[1], Object::Null), 4);
-    test_integer_object(mem::replace(&mut elements[2], Object::Null), 6);
+    test_integer_object(&elements[0], 1);
+    test_integer_object(&elements[1], 4);
+    test_integer_object(&elements[2], 6);
 }
 
 #[test]
@@ -666,7 +663,7 @@ fn array_index_expression() {
     for tt in tests {
         let evaluated = test_eval(tt.input);
         if let Some(integer) = tt.expected {
-            test_integer_object(evaluated, integer);
+            test_integer_object(&evaluated, integer);
         } else {
             test_null_object(evaluated);
         }
@@ -693,9 +690,9 @@ fn hash_literals() {
     let expected = {
         let mut m: HashMap<Object, i64> = HashMap::new();
         m.extend([
-            (Object::String("one".to_string()), 1),
-            (Object::String("two".to_string()), 2),
-            (Object::String("three".to_string()), 3),
+            ("one".into(), 1),
+            ("two".into(), 2),
+            ("three".into(), 3),
             (Object::Integer(4), 4),
             (Object::Boolean(true), 5),
             (Object::Boolean(false), 6),
@@ -707,7 +704,7 @@ fn hash_literals() {
 
     for (expected_key, expeced_value) in expected {
         let value = pairs.get(&expected_key).cloned().unwrap();
-        test_integer_object(value, expeced_value)
+        test_integer_object(&value, expeced_value)
     }
 }
 
@@ -747,7 +744,7 @@ fn hash_index_expression() {
     for tt in tests {
         let evaluated = test_eval(tt.input);
         if let Some(integer) = tt.expected {
-            test_integer_object(evaluated, integer);
+            test_integer_object(&evaluated, integer);
         } else {
             test_null_object(evaluated);
         }
@@ -763,9 +760,9 @@ pub(crate) fn test_eval(input: &str) -> Object {
     program.eval(env).unwrap_or_else(Object::Error)
 }
 
-fn test_integer_object(obj: Object, expected: i64) {
+fn test_integer_object(obj: &Object, expected: i64) {
     match obj {
-        Object::Integer(i) => assert_eq!(expected, i),
+        &Object::Integer(i) => assert_eq!(expected, i),
         _ => panic!("object is not Integer. got {}", obj.ty()),
     }
 }
