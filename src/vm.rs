@@ -5,6 +5,7 @@ use crate::object::{self, Object};
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::mem;
 
 use self::frame::Frame;
 
@@ -77,6 +78,7 @@ impl VM {
         std::mem::take(&mut self.frames[self.frames_index])
     }
 
+    #[allow(dead_code)]
     pub fn stack_top(&self) -> Object {
         if 0 == self.sp {
             Object::Null
@@ -234,29 +236,50 @@ impl VM {
 
                 Opcode::Closure => {
                     let const_index = code::read_u16(&ins[ip + 1..]);
-                    let _ = code::read_u8(&ins[ip + 3..]);
+                    let num_free = code::read_u8(&ins[ip + 3..]);
                     self.current_frame().ip += 3;
 
-                    self.push_closure(const_index as usize)?;
+                    self.push_closure(const_index as usize, num_free as usize)?;
+                }
+                Opcode::GetFree => {
+                    let free_index = code::read_u8(&ins[ip + 1..]);
+                    self.current_frame().ip += 1;
+
+                    let current_closure = &self.current_frame().cl;
+                    let Object::Closure { free, .. } = current_closure else {
+                        unreachable!();
+                    };
+                    let obj = free[free_index as usize].clone();
+                    self.push(obj)?;
                 }
 
-                _ => {
-                    eprintln!("todo!{op:?}")
+                Opcode::CurrentClosure => {
+                    let current_closure = self.current_frame().cl.clone();
+                    self.push(current_closure)?;
                 }
             }
         }
         Ok(())
     }
 
-    fn push_closure(&mut self, const_index: usize) -> Result<()> {
+    fn push_closure(&mut self, const_index: usize, num_free: usize) -> Result<()> {
         let constant = &self.constants[const_index];
         if !matches!(constant, Object::CompiledFunction { .. }) {
             return Err(format!("not a function: {}", constant.ty()).into());
         }
 
+        let free = self.stack[self.sp - num_free..self.sp].iter_mut().fold(
+            Vec::with_capacity(num_free),
+            |mut free, obj| {
+                free.push(mem::replace(obj, Object::Null));
+                free
+            },
+        );
+        self.sp -= num_free;
+
         let closure = Object::Closure {
             f: Box::new(constant.clone()),
-            free: vec![],
+            free,
         };
         self.push(closure)
     }

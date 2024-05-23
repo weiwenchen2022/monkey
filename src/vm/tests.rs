@@ -651,8 +651,7 @@ fn calling_functions_with_wrong_arguments() {
         let mut vm = VM::new(comp.bytecode());
         let err = vm
             .run()
-            .err()
-            .expect("expected VM error but resulted in none.");
+            .expect_err("expected VM error but resulted in none.");
         assert_eq!(
             tt.expected.downcast_ref::<&'static str>().copied().unwrap(),
             err
@@ -744,6 +743,139 @@ fn builtin_functions() {
             expected: Box::new(Object::Error(
                 "argument to `push` must be array, got integer".to_string(),
             )),
+        },
+    ];
+
+    run_vm_tests!(tests);
+}
+
+#[test]
+fn closures() {
+    let tests = &[
+        VmTestCase {
+            input: "
+		let newClosure = fn(a) {
+			fn() { a; };
+		};
+		let closure = newClosure(99);
+		closure();
+		",
+            expected: Box::new(99),
+        },
+        VmTestCase {
+            input: "
+		let newAdder = fn(a, b) {
+			fn(c) { a + b + c };
+		};
+		let adder = newAdder(1, 2);
+		adder(8);
+		",
+            expected: Box::new(11),
+        },
+        VmTestCase {
+            input: "
+		let newAdder = fn(a, b) {
+			let c = a + b;
+			fn(d) { c + d };
+		};
+		let adder = newAdder(1, 2);
+		adder(8);
+		",
+            expected: Box::new(11),
+        },
+        VmTestCase {
+            input: "
+		let newAdderOuter = fn(a, b) {
+			let c = a + b;
+			fn(d) {
+				let e = d + c;
+				fn(f) { e + f; };
+			};
+		};
+		let newAdderInner = newAdderOuter(1, 2)
+		let adder = newAdderInner(3);
+		adder(8);
+		",
+            expected: Box::new(14),
+        },
+        VmTestCase {
+            input: "
+		let a = 1;
+		let newAdderOuter = fn(b) {
+			fn(c) {
+				fn(d) { a + b + c + d };
+			};
+		};
+		let newAdderInner = newAdderOuter(2)
+		let adder = newAdderInner(3);
+		adder(8);
+		",
+            expected: Box::new(14),
+        },
+        VmTestCase {
+            input: "
+		let newClosure = fn(a, b) {
+			let one = fn() { a; };
+			let two = fn() { b; };
+			fn() { one() + two(); };
+		};
+		let closure = newClosure(9, 90);
+		closure();
+		",
+            expected: Box::new(99),
+        },
+    ];
+
+    run_vm_tests!(tests);
+}
+
+#[test]
+fn recursive_functions() {
+    let tests = &[
+        VmTestCase {
+            input: "
+		let countDown = fn(x) {
+			if (x == 0) {
+				return 0;
+			} else {
+				countDown(x - 1);
+			}
+		};
+		countDown(1);
+		",
+            expected: Box::new(0),
+        },
+        VmTestCase {
+            input: "
+		let countDown = fn(x) {
+			if (x == 0) {
+				return 0;
+			} else {
+				countDown(x - 1);
+			}
+		};
+		let wrapper = fn() {
+			countDown(1);
+		};
+		wrapper();
+		",
+            expected: Box::new(0),
+        },
+        VmTestCase {
+            input: "
+		let wrapper = fn() {
+			let countDown = fn(x) {
+				if (x == 0) {
+					return 0;
+				} else {
+					countDown(x - 1);
+				}
+			};
+			countDown(1);
+		};
+		wrapper();
+		",
+            expected: Box::new(0),
         },
     ];
 

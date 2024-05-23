@@ -162,6 +162,7 @@ where
             token,
             parameters,
             body,
+            name,
         }) => {
             let parameters = parameters
                 .into_iter()
@@ -183,6 +184,7 @@ where
                 token,
                 parameters,
                 body: Box::new(body),
+                name,
             })
         }
 
@@ -418,6 +420,7 @@ mod tests {
                             expression: one(),
                         }],
                     }),
+                    name: String::new(),
                 }),
                 expected: Node::Expression(Expression::FunctionLiteral {
                     token: Token::Function,
@@ -429,6 +432,7 @@ mod tests {
                             expression: two(),
                         }],
                     }),
+                    name: String::new(),
                 }),
             },
             // array literal

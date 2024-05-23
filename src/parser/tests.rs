@@ -1209,6 +1209,29 @@ fn parsing_marco_literal() {
     );
 }
 
+#[test]
+fn function_literal_with_name() {
+    let input = "let myFunction = fn() { };";
+
+    let l = Lexer::new(input.as_bytes());
+    let mut p = Parser::new(l);
+    let program = p.parse_program();
+    check_parse_errors(&p);
+
+    assert_eq!(1, program.statements.len());
+
+    let stmt = &program.statements[0];
+    let Statement::Let { value, .. } = stmt else {
+        panic!("program.Statements[0] is not ast.LetStatement. got={stmt:?}");
+    };
+
+    let Expression::FunctionLiteral { name, .. } = value else {
+        panic!("stmt.Value is not ast.FunctionLiteral. got={value:?}");
+    };
+
+    assert_eq!("myFunction", name);
+}
+
 fn test_infix_expression(
     exp: &Expression,
     expected_left: &Any,

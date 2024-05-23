@@ -77,18 +77,20 @@ impl<'a> Parser<'a> {
 
     fn parse_statement(&mut self) -> Option<Statement> {
         match self.cur_token {
-            Token::Let => self.parse_letstatement(),
-            Token::Return => self.parse_returnstatement(),
+            Token::Let => self.parse_let_statement(),
+            Token::Return => self.parse_return_statement(),
             _ => self.parse_expressionstatement(),
         }
     }
 
-    fn parse_letstatement(&mut self) -> Option<Statement> {
+    fn parse_let_statement(&mut self) -> Option<Statement> {
         let token = self.cur_token.clone();
 
         if !self.expect_peek(Token::Ident("".to_string())) {
             return None;
         }
+
+        let identifier = self.cur_token.to_string();
 
         let name = Expression::Identifier {
             token: self.cur_token.clone(),
@@ -101,7 +103,11 @@ impl<'a> Parser<'a> {
 
         self.next_token();
 
-        let value = self.parse_expression(LOWEST).unwrap_or(Expression::Null);
+        let mut value = self.parse_expression(LOWEST).unwrap_or(Expression::Null);
+
+        if let Expression::FunctionLiteral { name, .. } = &mut value {
+            *name = identifier;
+        }
 
         if self.peek_token_is(&Token::Semicolon) {
             self.next_token();
@@ -110,7 +116,7 @@ impl<'a> Parser<'a> {
         Some(Statement::Let { token, name, value })
     }
 
-    fn parse_returnstatement(&mut self) -> Option<Statement> {
+    fn parse_return_statement(&mut self) -> Option<Statement> {
         let token = self.cur_token.clone();
 
         self.next_token();
@@ -283,6 +289,7 @@ impl<'a> Parser<'a> {
             token,
             parameters,
             body: Box::new(body),
+            name: String::new(),
         })
     }
 

@@ -5,7 +5,8 @@ pub(crate) enum SymbolScope {
     Local,
     Global,
     Builtin,
-    // Free,
+    Free,
+    Function,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -20,6 +21,8 @@ pub(crate) struct SymbolTable {
 
     store: HashMap<String, Symbol>,
     pub(crate) num_definitions: usize,
+
+    pub(crate) free_symbols: Vec<Symbol>,
 }
 
 impl SymbolTable {
@@ -29,6 +32,8 @@ impl SymbolTable {
 
             store: HashMap::new(),
             num_definitions: 0,
+
+            free_symbols: Vec::new(),
         }
     }
 
@@ -49,11 +54,17 @@ impl SymbolTable {
         symbol
     }
 
-    pub(crate) fn resolve(&self, name: &str) -> Option<Symbol> {
+    pub(crate) fn resolve(&mut self, name: &str) -> Option<Symbol> {
         if let obj @ Some(_) = self.store.get(name).cloned() {
             obj
         } else if let Some(outer) = &self.outer {
-            outer.borrow().resolve(name)
+            let obj = outer.borrow_mut().resolve(name)?;
+            if matches!(obj.scope, SymbolScope::Global | SymbolScope::Builtin) {
+                return Some(obj);
+            }
+
+            let free = self.define_free(obj);
+            Some(free)
         } else {
             None
         }
@@ -64,6 +75,29 @@ impl SymbolTable {
             name: Rc::new(name.clone()),
             scope: SymbolScope::Builtin,
             index,
+        };
+        self.store.insert(name, symbol.clone());
+        symbol
+    }
+
+    pub(crate) fn define_free(&mut self, original: Symbol) -> Symbol {
+        self.free_symbols.push(original.clone());
+
+        let symbol = Symbol {
+            name: original.name.clone(),
+            index: self.free_symbols.len() - 1,
+            scope: SymbolScope::Free,
+        };
+        self.store
+            .insert(original.name.as_ref().clone(), symbol.clone());
+        symbol
+    }
+
+    pub(crate) fn define_function_name(&mut self, name: String) -> Symbol {
+        let symbol = Symbol {
+            name: Rc::new(name.clone()),
+            scope: SymbolScope::Function,
+            index: 0,
         };
         self.store.insert(name, symbol.clone());
         symbol

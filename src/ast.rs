@@ -192,6 +192,7 @@ pub enum Expression {
         token: Token, // The 'fn' token
         parameters: Vec<Expression>,
         body: Box<Statement>,
+        name: String,
     },
 
     Call {
@@ -314,9 +315,15 @@ impl Display for Expression {
             }
 
             Expression::FunctionLiteral {
-                parameters, body, ..
+                parameters,
+                body,
+                name,
+                ..
             } => {
                 write!(f, "{}", self.token_literal())?;
+                if !name.is_empty() {
+                    write!(f, "<{name}>")?;
+                }
                 write!(f, "(")?;
                 parameters.iter().enumerate().try_for_each(|(i, p)| {
                     if i > 0 {

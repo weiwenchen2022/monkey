@@ -174,13 +174,13 @@ impl Compiler {
             }
 
             Node::Statement(Statement::Let { name, value, .. }) => {
-                self.compile(value)?;
-
                 let Expression::Identifier { value: name, .. } = name else {
                     panic!("{name:?}");
                 };
-
                 let symbol = self.symbol_table.borrow_mut().define(name);
+
+                self.compile(value)?;
+
                 if SymbolScope::Global == symbol.scope {
                     self.emit(Opcode::SetGlobal, &[symbol.index as i64]);
                 } else {
@@ -189,7 +189,7 @@ impl Compiler {
             }
 
             Node::Expression(Expression::Identifier { value: name, .. }) => {
-                let Some(symbol) = self.symbol_table.borrow().resolve(&name) else {
+                let Some(symbol) = self.symbol_table.borrow_mut().resolve(&name) else {
                     return Err(format!("undefined variable {name}"));
                 };
 
@@ -229,9 +229,16 @@ impl Compiler {
             }
 
             Node::Expression(Expression::FunctionLiteral {
-                parameters, body, ..
+                parameters,
+                body,
+                name,
+                ..
             }) => {
                 self.enter_scope();
+
+                if !name.is_empty() {
+                    self.symbol_table.borrow_mut().define_function_name(name);
+                }
 
                 let num_parameters = parameters.len() as u8;
                 parameters.into_iter().for_each(|p| {
@@ -251,8 +258,13 @@ impl Compiler {
                     self.emit(Opcode::Return, &[]);
                 }
 
+                let free_symbols = self.symbol_table.borrow().free_symbols.clone();
                 let num_locals = self.symbol_table.borrow().num_definitions as u8;
                 let instructions = self.leave_scope();
+
+                for s in &free_symbols {
+                    self.load_symbol(s);
+                }
 
                 let compiled_fn = Object::CompiledFunction {
                     instructions,
@@ -260,7 +272,10 @@ impl Compiler {
                     num_parameters,
                 };
                 let fn_index = self.add_constant(compiled_fn);
-                self.emit(Opcode::Closure, &[fn_index as i64, 0]);
+                self.emit(
+                    Opcode::Closure,
+                    &[fn_index as i64, free_symbols.len() as i64],
+                );
             }
 
             Node::Statement(Statement::Return { return_value, .. }) => {
@@ -290,6 +305,8 @@ impl Compiler {
             SymbolScope::Global => self.emit(Opcode::GetGlobal, &[s.index as i64]),
             SymbolScope::Local => self.emit(Opcode::GetLocal, &[s.index as i64]),
             SymbolScope::Builtin => self.emit(Opcode::GetBuiltin, &[s.index as i64]),
+            SymbolScope::Free => self.emit(Opcode::GetFree, &[s.index as i64]),
+            SymbolScope::Function => self.emit(Opcode::CurrentClosure, &[]),
         };
     }
 

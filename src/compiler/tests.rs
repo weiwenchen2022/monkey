@@ -767,7 +767,6 @@ fn builtins() {
 }
 
 #[test]
-#[ignore = "reason"]
 fn closures() {
     let tests = &[
         CompilerTestCase {
@@ -881,6 +880,76 @@ fn closures() {
                 make!(Opcode::Constant, 0),
                 make!(Opcode::SetGlobal, 0),
                 make!(Opcode::Closure, 6, 0),
+                make!(Opcode::Pop),
+            ],
+        },
+    ];
+
+    run_compiler_tests!(tests);
+}
+
+#[test]
+fn recursive_functions() {
+    let tests = &[
+        CompilerTestCase {
+            input: "
+			let countDown = fn(x) { countDown(x - 1); };
+			countDown(1);
+			",
+            expected_constants: vec![
+                Box::new(1),
+                Box::new(vec![
+                    make!(Opcode::CurrentClosure),
+                    make!(Opcode::GetLocal, 0),
+                    make!(Opcode::Constant, 0),
+                    make!(Opcode::Sub),
+                    make!(Opcode::Call, 1),
+                    make!(Opcode::ReturnValue),
+                ]),
+                Box::new(1),
+            ],
+            expected_instructions: vec![
+                make!(Opcode::Closure, 1, 0),
+                make!(Opcode::SetGlobal, 0),
+                make!(Opcode::GetGlobal, 0),
+                make!(Opcode::Constant, 2),
+                make!(Opcode::Call, 1),
+                make!(Opcode::Pop),
+            ],
+        },
+        CompilerTestCase {
+            input: "
+			let wrapper = fn() {
+				let countDown = fn(x) { countDown(x - 1); };
+				countDown(1);
+			};
+			wrapper();
+			",
+            expected_constants: vec![
+                Box::new(1),
+                Box::new(vec![
+                    make!(Opcode::CurrentClosure),
+                    make!(Opcode::GetLocal, 0),
+                    make!(Opcode::Constant, 0),
+                    make!(Opcode::Sub),
+                    make!(Opcode::Call, 1),
+                    make!(Opcode::ReturnValue),
+                ]),
+                Box::new(1),
+                Box::new(vec![
+                    make!(Opcode::Closure, 1, 0),
+                    make!(Opcode::SetLocal, 0),
+                    make!(Opcode::GetLocal, 0),
+                    make!(Opcode::Constant, 2),
+                    make!(Opcode::Call, 1),
+                    make!(Opcode::ReturnValue),
+                ]),
+            ],
+            expected_instructions: vec![
+                make!(Opcode::Closure, 3, 0),
+                make!(Opcode::SetGlobal, 0),
+                make!(Opcode::GetGlobal, 0),
+                make!(Opcode::Call, 0),
                 make!(Opcode::Pop),
             ],
         },

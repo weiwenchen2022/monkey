@@ -122,6 +122,7 @@ pub(crate) enum Opcode {
 
     Closure,
     GetFree,
+    CurrentClosure,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -347,6 +348,13 @@ lazy_static! {
                 Definition {
                     name: "OpGetFree",
                     operand_widths: &[1],
+                },
+            ),
+            (
+                Opcode::CurrentClosure,
+                Definition {
+                    name: "OpCurrentClosure",
+                    operand_widths: &[],
                 },
             ),
         ]);
