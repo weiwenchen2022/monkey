@@ -12,7 +12,7 @@ fn let_statements() {
         expected_identifier: &'a str,
         expected_value: Any,
     }
-    let tests: &[Test] = &[
+    let tests = &[
         Test {
             input: "let x = 5;",
             expected_identifier: "x",
@@ -55,7 +55,7 @@ fn return_statements() {
         expected_value: Any,
     }
 
-    let tests: &[Test] = &[
+    let tests = &[
         Test {
             input: "return 5;",
             expected_value: Box::new(5),
@@ -150,7 +150,7 @@ fn parsing_prefix_expression() {
         operator: &'a str,
         value: Any,
     }
-    let prefix_tests: &[Test] = &[
+    let prefix_tests = &[
         Test {
             input: "!5",
             operator: "!",
@@ -216,7 +216,7 @@ fn parsing_infix_expression() {
         operator: &'static str,
         right_value: Any,
     }
-    let infix_tests: &[Test] = &[
+    let infix_tests = &[
         Test {
             input: "5 + 5;",
             left_value: Box::new(5),
@@ -369,7 +369,7 @@ fn operator_precedence_parsing() {
         expected: &'static str,
     }
 
-    let tests: &[Test] = &[
+    let tests = &[
         Test {
             input: "-a * b",
             expected: "((-a) * b)",
@@ -497,7 +497,7 @@ fn boolean_expression() {
         expected_boolean: bool,
     }
 
-    let tests: &[Test] = &[
+    let tests = &[
         Test {
             input: "true;",
             expected_boolean: true,
@@ -712,7 +712,7 @@ fn function_parameter_parsing() {
         input: &'a str,
         expected_params: Vec<&'a str>,
     }
-    let tests: &[Test] = &[
+    let tests = &[
         Test {
             input: "fn () {};",
             expected_params: vec![],
@@ -807,7 +807,7 @@ fn call_expression_parameter_parsing() {
         expected_args: &'a [&'a str],
     }
 
-    let tests: &[Test] = &[
+    let tests = &[
         Test {
             input: "add();",
             expected_ident: "add",
@@ -1273,6 +1273,7 @@ fn test_boolean_literal(exp: &Expression, expected: bool) {
     let Expression::Boolean { value, .. } = exp else {
         panic!("not boolean expression got {exp:?}");
     };
+
     assert_eq!(expected, *value);
     assert_eq!(format!("{}", expected), exp.token_literal());
 }
