@@ -1,8 +1,8 @@
 use crate::token::Token;
-use std::{
-    collections::HashMap,
-    fmt::{self, Display},
-};
+
+use std::collections::HashMap;
+use std::fmt::{self, Display};
+use std::hash::{Hash, Hasher};
 
 #[derive(Clone)]
 pub enum Node {
@@ -71,10 +71,7 @@ impl Tokenizer for Program {
 
 impl Display for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for s in &self.statements {
-            s.fmt(f)?;
-        }
-        Ok(())
+        self.statements.iter().try_for_each(|s| s.fmt(f))
     }
 }
 
@@ -138,12 +135,7 @@ impl Display for Statement {
                 write!(f, "{}", expression)
             }
 
-            Statement::Block { statements, .. } => {
-                for s in statements {
-                    write!(f, "{}", s)?;
-                }
-                Ok(())
-            }
+            Statement::Block { statements, .. } => statements.iter().try_for_each(|s| s.fmt(f)),
         }
     }
 }
@@ -151,8 +143,6 @@ impl Display for Statement {
 // Expressions
 #[derive(Clone, Debug)]
 pub enum Expression {
-    Null,
-
     Identifier {
         token: Token, // the Token::IDENT token
         value: String,
@@ -237,8 +227,6 @@ impl PartialEq for Expression {
 
 impl Eq for Expression {}
 
-use std::hash::{Hash, Hasher};
-
 impl Hash for Expression {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.to_string().hash(state)
@@ -248,8 +236,6 @@ impl Hash for Expression {
 impl Tokenizer for Expression {
     fn token_literal(&self) -> String {
         match self {
-            Expression::Null => "null".to_string(),
-
             Expression::Identifier { token, .. }
             | Expression::Boolean { token, .. }
             | Expression::IntegerLiteral { token, .. }
@@ -262,7 +248,7 @@ impl Tokenizer for Expression {
             | Expression::ArrayLiteral { token, .. }
             | Expression::Index { token, .. }
             | Expression::HashLiteral { token, .. }
-            | Expression::MacroLiteral { token, .. } => token.to_string(),
+            | Expression::MacroLiteral { token, .. } => format!("{}", token),
         }
     }
 }
@@ -397,8 +383,6 @@ impl Display for Expression {
                 write!(f, ") ")?;
                 write!(f, "{}", body)
             }
-
-            Expression::Null => unreachable!("null"),
         }
     }
 }

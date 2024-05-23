@@ -79,7 +79,7 @@ impl<'a> Parser<'a> {
         match self.cur_token {
             Token::Let => self.parse_let_statement(),
             Token::Return => self.parse_return_statement(),
-            _ => self.parse_expressionstatement(),
+            _ => self.parse_expression_statement(),
         }
     }
 
@@ -89,8 +89,6 @@ impl<'a> Parser<'a> {
         if !self.expect_peek(Token::Ident("".to_string())) {
             return None;
         }
-
-        let identifier = self.cur_token.to_string();
 
         let name = Expression::Identifier {
             token: self.cur_token.clone(),
@@ -103,10 +101,14 @@ impl<'a> Parser<'a> {
 
         self.next_token();
 
-        let mut value = self.parse_expression(LOWEST).unwrap_or(Expression::Null);
+        let mut value = self.parse_expression(LOWEST)?;
 
-        if let Expression::FunctionLiteral { name, .. } = &mut value {
-            *name = identifier;
+        if let Expression::FunctionLiteral { name: fn_name, .. } = &mut value {
+            *fn_name = if let Expression::Identifier { value: name, .. } = &name {
+                name.clone()
+            } else {
+                unreachable!();
+            };
         }
 
         if self.peek_token_is(&Token::Semicolon) {
@@ -121,7 +123,7 @@ impl<'a> Parser<'a> {
 
         self.next_token();
 
-        let return_value = self.parse_expression(LOWEST).unwrap_or(Expression::Null);
+        let return_value = self.parse_expression(LOWEST)?;
 
         if self.peek_token_is(&Token::Semicolon) {
             self.next_token();
@@ -133,9 +135,9 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_expressionstatement(&mut self) -> Option<Statement> {
+    fn parse_expression_statement(&mut self) -> Option<Statement> {
         let token = self.cur_token.clone();
-        let expression = self.parse_expression(LOWEST).unwrap_or(Expression::Null);
+        let expression = self.parse_expression(LOWEST)?;
 
         if self.peek_token_is(&Token::Semicolon) {
             self.next_token();
@@ -196,7 +198,7 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        let body = self.parse_blockstatement();
+        let body = self.parse_block_statement();
 
         Some(Expression::MacroLiteral {
             token,
@@ -283,7 +285,7 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        let body = self.parse_blockstatement();
+        let body = self.parse_block_statement();
 
         Some(Expression::FunctionLiteral {
             token,
@@ -335,7 +337,7 @@ impl<'a> Parser<'a> {
 
         self.next_token();
 
-        let codition = self.parse_expression(LOWEST);
+        let codition = self.parse_expression(LOWEST)?;
 
         if !self.expect_peek(Token::RParen) {
             return None;
@@ -345,7 +347,7 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        let consequence = self.parse_blockstatement();
+        let consequence = self.parse_block_statement();
 
         let alternative = if self.peek_token_is(&Token::Else) {
             self.next_token();
@@ -354,23 +356,23 @@ impl<'a> Parser<'a> {
                 return None;
             }
 
-            Some(Box::new(self.parse_blockstatement()))
+            Some(Box::new(self.parse_block_statement()))
         } else {
             None
         };
 
         Some(Expression::If {
             token,
-            condition: Box::new(codition?),
+            condition: Box::new(codition),
             consequence: Box::new(consequence),
             alternative,
         })
     }
 
-    fn parse_blockstatement(&mut self) -> Statement {
+    fn parse_block_statement(&mut self) -> Statement {
         let token = self.cur_token.clone();
 
-        let mut statements = vec![];
+        let mut statements = Vec::new();
         self.next_token();
 
         while !self.cur_token_is(Token::RBrace) && !self.cur_token_is(Token::Eof) {
@@ -402,7 +404,7 @@ impl<'a> Parser<'a> {
 
         self.next_token();
 
-        let right = self.parse_expression(PREFIX).unwrap_or(Expression::Null);
+        let right = self.parse_expression(PREFIX)?;
         Some(Expression::Prefix {
             token,
             operator,
@@ -469,9 +471,7 @@ impl<'a> Parser<'a> {
         let precedence = self.cur_precedence();
         self.next_token();
 
-        let right = self
-            .parse_expression(precedence)
-            .unwrap_or(Expression::Null);
+        let right = self.parse_expression(precedence)?;
 
         Some(Expression::Infix {
             token,
