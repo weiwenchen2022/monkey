@@ -1,3 +1,6 @@
+use std::fmt;
+use std::hash::{Hash, Hasher};
+
 #[derive(Clone)]
 pub enum Token {
     Illegal(String),
@@ -44,9 +47,6 @@ pub enum Token {
     Return,   // return
     Marco,    // macro
 }
-
-use std::fmt;
-use std::hash::{Hash, Hasher};
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

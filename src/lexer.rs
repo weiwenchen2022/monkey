@@ -173,7 +173,7 @@ if (5 < 10) {
 macro(x, y) { x + y; };
 "#;
 
-        let expected: &[Token] = &[
+        let expected = &[
             Token::Let,
             Token::Ident("five".to_string()),
             Token::Assign,
@@ -279,7 +279,7 @@ macro(x, y) { x + y; };
         let mut l = Lexer::new(input);
         for t in expected {
             let tok = l.next_token();
-            assert_eq!(*t, tok);
+            assert_eq!(t, &tok);
         }
     }
 }
