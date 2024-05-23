@@ -25,44 +25,41 @@ pub(crate) static BUILTINS: &[(&str, BuiltinFunction)] = &[
             .map_err(|err| format!("{err}"))?;
         Ok(Object::Null)
     }),
-    ("first", |mut args| -> evaluator::Result<Object> {
+    ("first", |args| -> evaluator::Result<Object> {
         if args.len() != 1 {
             return error!("wrong number of arguments. got={}, want=1", args.len());
         }
 
-        let arg = args.pop().unwrap();
-        match arg {
+        match &args[0] {
             Object::Array(elements) => Ok(elements.first().cloned().unwrap_or(Object::Null)),
-            _ => error!("argument to `first` must be array, got {}", arg.ty()),
+            _ => error!("argument to `first` must be array, got {}", args[0].ty()),
         }
     }),
-    ("last", |mut args| -> evaluator::Result<Object> {
+    ("last", |args| -> evaluator::Result<Object> {
         if args.len() != 1 {
             return error!("wrong number of arguments. got={}, want=1", args.len());
         }
 
-        let arg = args.pop().unwrap();
-        match arg {
+        match &args[0] {
             Object::Array(elements) => Ok(elements.last().cloned().unwrap_or(Object::Null)),
-            _ => error!("argument to `last` must be array, got {}", arg.ty()),
+            _ => error!("argument to `last` must be array, got {}", args[0].ty()),
         }
     }),
-    ("rest", |mut args| -> evaluator::Result<Object> {
+    ("rest", |args| -> evaluator::Result<Object> {
         if args.len() != 1 {
             return error!("wrong number of arguments. got={}, want=1", args.len());
         }
 
-        let arg = args.pop().unwrap();
-        match arg {
+        match &args[0] {
             Object::Array(elements) => {
                 if !elements.is_empty() {
-                    let elements: Vec<_> = elements.iter().skip(1).cloned().collect();
+                    let elements = elements[1..].to_vec();
                     Ok(elements.into())
                 } else {
                     Ok(Object::Null)
                 }
             }
-            _ => error!("argument to `rest` must be array, got {}", arg.ty()),
+            _ => error!("argument to `rest` must be array, got {}", args[0].ty()),
         }
     }),
     ("push", |mut args| -> evaluator::Result<Object> {

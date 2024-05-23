@@ -1,7 +1,7 @@
 use std::{collections::HashMap, ops::Deref};
 
 use super::Evaluator;
-use crate::{environment::Environment, lexer::Lexer, object::Object, parser::Parser};
+use crate::{lexer::Lexer, object::Environment, object::Object, parser::Parser};
 
 pub(crate) struct Test<'a, T> {
     pub(crate) input: &'a str,

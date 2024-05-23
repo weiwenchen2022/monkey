@@ -1,6 +1,6 @@
 use super::Evaluator;
 use crate::ast::{self, Expression, Node, Tokenizer};
-use crate::environment::Environment;
+use crate::object::Environment;
 use crate::object::Object;
 
 pub(crate) fn quote(node: Node, env: Environment) -> Object {

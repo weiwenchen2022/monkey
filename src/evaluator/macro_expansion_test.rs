@@ -1,5 +1,5 @@
 use super::{define_macros, expand_macros, tests::Test};
-use crate::{ast::Program, environment::Environment, lexer::Lexer, object::Object, parser::Parser};
+use crate::{ast::Program, lexer::Lexer, object::Environment, object::Object, parser::Parser};
 
 #[test]
 fn define_marco() {

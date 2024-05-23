@@ -12,13 +12,10 @@ pub use parser::Parser;
 
 #[macro_use]
 pub mod object;
-pub use object::Object;
+pub use object::{Environment, Object};
 
 mod evaluator;
 pub use evaluator::Evaluator;
-
-mod environment;
-pub use environment::Environment;
 
 #[macro_use]
 mod code;

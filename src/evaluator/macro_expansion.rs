@@ -2,7 +2,7 @@
 
 use crate::{
     ast::{self, Expression, Node, Program, Statement},
-    environment::Environment,
+    object::Environment,
     object::Object,
 };
 

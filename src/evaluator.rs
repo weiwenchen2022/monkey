@@ -5,9 +5,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::ast::{Expression, Node, Program, Statement};
-use crate::environment::Environment;
 use crate::error;
-use crate::object::Object;
+use crate::object::{Environment, Object};
 
 mod builtins;
 

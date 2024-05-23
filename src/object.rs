@@ -1,9 +1,16 @@
+use crate::ast::{Expression, Node, Statement};
+use crate::code::Instructions;
+use crate::evaluator;
+
 use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::rc::Rc;
 
 mod builtins;
 pub(crate) use builtins::{get_builtin_function_by_name, BUILTINS};
+
+mod environment;
+pub use environment::Environment;
 
 #[macro_export]
 macro_rules! error {
@@ -17,21 +24,28 @@ pub type BuiltinFunction = fn(Vec<Object>) -> evaluator::Result<Object>;
 #[derive(Clone)]
 pub enum Object {
     Null,
+
     Integer(i64),
     Boolean(bool),
+
     ReturnValue(Box<Object>),
+
     Error(String),
+
     Function {
         parameters: Vec<Expression>,
         body: Statement,
         env: Environment,
     },
+
     String(Rc<String>),
+
     Builtin(BuiltinFunction),
+
     Array(Rc<Vec<Object>>),
     Hash(Rc<HashMap<Object, Object>>),
-    Quote(Node),
 
+    Quote(Node),
     Macro {
         parameters: Vec<Expression>,
         body: Statement,
@@ -198,7 +212,7 @@ impl Display for Object {
             }
 
             Object::CompiledFunction { .. } => write!(f, "compiled function [{:p}]", self),
-            Object::Closure { .. } => write!(f, "clsure [{:p}]", self),
+            Object::Closure { .. } => write!(f, "closure [{:p}]", self),
         }
     }
 }
@@ -306,11 +320,6 @@ impl PartialEq for Object {
 impl Eq for Object {}
 
 use std::cmp::Ordering;
-
-use crate::ast::{Expression, Node, Statement};
-use crate::code::Instructions;
-use crate::environment::Environment;
-use crate::evaluator;
 
 impl PartialOrd for Object {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
