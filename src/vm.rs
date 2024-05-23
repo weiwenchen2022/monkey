@@ -497,7 +497,7 @@ impl VM {
         o
     }
 
-    pub(crate) fn last_popped_stack_elem(&self) -> Object {
+    pub fn last_popped_stack_elem(&self) -> Object {
         self.stack[self.sp].clone()
     }
 }

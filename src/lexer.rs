@@ -1,6 +1,6 @@
 use crate::token::Token;
 
-pub(crate) struct Lexer<'a> {
+pub struct Lexer<'a> {
     input: &'a [u8],
     position: usize,      // current position in input (points to current char)
     read_position: usize, // current reading position in input (after current char)
@@ -8,7 +8,7 @@ pub(crate) struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    pub(crate) fn new(input: &'a [u8]) -> Self {
+    pub fn new(input: &'a [u8]) -> Self {
         let mut l = Self {
             input,
             position: 0,

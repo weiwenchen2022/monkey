@@ -882,6 +882,29 @@ fn recursive_functions() {
     run_vm_tests!(tests);
 }
 
+#[test]
+fn recursive_fibonacci() {
+    let tests = &[VmTestCase {
+        input: "
+		let fibonacci = fn(x) {
+			if (x == 0) {
+				return 0;
+			} else {
+				if (x == 1) {
+					return 1;
+				} else {
+					fibonacci(x - 1) + fibonacci(x - 2);
+				}
+			}
+		};
+		fibonacci(15);
+		",
+        expected: Box::new(610),
+    }];
+
+    run_vm_tests!(tests);
+}
+
 fn parse(input: &str) -> Program {
     let l = Lexer::new(input.as_bytes());
     let mut p = Parser::new(l);

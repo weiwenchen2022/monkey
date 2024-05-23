@@ -16,7 +16,7 @@ pub(crate) struct Symbol {
     pub(crate) index: usize,
 }
 
-pub(crate) struct SymbolTable {
+pub struct SymbolTable {
     pub(crate) outer: Option<Rc<RefCell<SymbolTable>>>,
 
     store: HashMap<String, Symbol>,
