@@ -15,7 +15,7 @@ pub mod object;
 pub use object::{Environment, Object};
 
 mod evaluator;
-pub use evaluator::Evaluator;
+pub use evaluator::eval;
 
 #[macro_use]
 mod code;

@@ -1,6 +1,6 @@
-use std::{collections::HashMap, ops::Deref};
+use std::{cell::RefCell, collections::HashMap, ops::Deref, rc::Rc};
 
-use super::Evaluator;
+use super::eval;
 use crate::{lexer::Lexer, object::Environment, object::Object, parser::Parser};
 
 pub(crate) struct Test<'a, T> {
@@ -755,9 +755,9 @@ pub(crate) fn test_eval(input: &str) -> Object {
     let l = Lexer::new(input.as_bytes());
     let mut p = Parser::new(l);
     let program = p.parse_program();
-    let env = Environment::new(None);
+    let env = Environment::default();
 
-    program.eval(env).unwrap_or_else(Object::Error)
+    eval(program, &env).unwrap_or_else(Object::Error)
 }
 
 fn test_integer_object(obj: &Object, expected: i64) {

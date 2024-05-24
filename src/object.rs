@@ -9,7 +9,7 @@ use std::rc::Rc;
 mod builtins;
 pub(crate) use builtins::{get_builtin_function_by_name, BUILTINS};
 
-mod environment;
+pub(crate) mod environment;
 pub use environment::Environment;
 
 #[macro_export]

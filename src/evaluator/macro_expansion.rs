@@ -1,14 +1,16 @@
 #![allow(dead_code)]
 
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     ast::{self, Expression, Node, Program, Statement},
     object::Environment,
     object::Object,
 };
 
-use super::Evaluator;
+use super::eval;
 
-pub(crate) fn define_macros(program: &mut Program, env: &mut Environment) {
+pub(crate) fn define_macros(program: &mut Program, env: &Environment) {
     let mut definitions = vec![];
 
     for (i, statement) in program.statements.iter().enumerate() {
@@ -44,7 +46,7 @@ pub(crate) fn expand_macros(program: Program, env: &Environment) -> Node {
         let Object::Macro { body, .. } = obj else {
             panic!();
         };
-        let evaluated = body.eval(eval_env).unwrap();
+        let evaluated = eval(body, &eval_env).unwrap();
 
         let Object::Quote(node) = evaluated else {
             panic!("we only support returning AST-nodes from macros");
@@ -59,7 +61,7 @@ fn is_macro_call(function: &Expression, env: &Environment) -> (Object, bool) {
         return (Object::Null, false);
     };
 
-    let Some(obj) = env.get(value) else {
+    let Some(obj) = env.borrow().get(value) else {
         return (Object::Null, false);
     };
 
@@ -84,7 +86,9 @@ fn extend_macro_env(obj: Object, mut args: Vec<Object>) -> Environment {
     else {
         panic!();
     };
-    let extended = Environment::new(Some(Box::new(env)));
+
+    use crate::object::environment::_Environment;
+    let mut extended = _Environment::new(Some(env));
 
     let mut args = args.drain(..);
 
@@ -94,7 +98,7 @@ fn extend_macro_env(obj: Object, mut args: Vec<Object>) -> Environment {
         };
         extended.set(name, args.next().unwrap());
     }
-    extended
+    Rc::new(RefCell::new(extended))
 }
 
 fn is_macro_definition(node: &Statement) -> bool {
@@ -104,7 +108,7 @@ fn is_macro_definition(node: &Statement) -> bool {
     matches!(value, Expression::MacroLiteral { .. })
 }
 
-fn add_macro(stmt: Statement, env: &mut Environment) {
+fn add_macro(stmt: Statement, env: &Environment) {
     let Statement::Let { name, value, .. } = stmt else {
         panic!();
     };
@@ -119,12 +123,12 @@ fn add_macro(stmt: Statement, env: &mut Environment) {
         panic!();
     };
 
-    env.set(
+    env.borrow_mut().set(
         name,
         Object::Macro {
             parameters,
             body: *body,
-            env: env.clone(),
+            env: Rc::clone(&env),
         },
     );
 }

@@ -1,3 +1,5 @@
+use std::{cell::RefCell, ops::Deref, rc::Rc};
+
 use super::{define_macros, expand_macros, tests::Test};
 use crate::{ast::Program, lexer::Lexer, object::Environment, object::Object, parser::Parser};
 
@@ -9,16 +11,19 @@ fn define_marco() {
     let mymacro = macro(x, y) { x + y; };
 ";
 
-    let mut env = Environment::new(None);
+    let env = Environment::default();
     let mut program = test_parse_program(input);
 
-    define_macros(&mut program, &mut env);
+    define_macros(&mut program, &env);
 
     assert_eq!(2, program.statements.len());
 
-    assert!(env.get("number").is_none());
-    assert!(env.get("function").is_none());
-    let obj = env.get("mymacro").expect("macro not in environment.");
+    assert!(env.borrow().get("number").is_none());
+    assert!(env.borrow().get("function").is_none());
+    let obj = env
+        .borrow()
+        .get("mymacro")
+        .expect("macro not in environment.");
     let Object::Macro {
         parameters, body, ..
     } = obj
@@ -73,9 +78,9 @@ fn test_expand_macros() {
         let expected = test_parse_program(tt.expected);
         let mut program = test_parse_program(tt.input);
 
-        let mut env = Environment::new(None);
+        let env = Environment::default();
 
-        define_macros(&mut program, &mut env);
+        define_macros(&mut program, &env);
 
         let expanded = expand_macros(program, &env);
 

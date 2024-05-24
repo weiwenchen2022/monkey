@@ -1,36 +1,38 @@
+use crate::object::Object;
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::object::Object;
+pub type Environment = Rc<RefCell<_Environment>>;
 
-#[derive(Clone)]
-pub struct Environment {
-    outer: Option<Box<Environment>>,
-    store: Rc<RefCell<HashMap<String, Object>>>,
+#[derive(Clone, Default)]
+pub struct _Environment {
+    outer: Option<Environment>,
+    store: HashMap<String, Object>,
 }
 
-impl Environment {
-    pub fn new(outer: Option<Box<Environment>>) -> Self {
+impl _Environment {
+    pub fn new(outer: Option<Environment>) -> Self {
         Self {
             outer,
-            store: Rc::new(RefCell::new(HashMap::new())),
+            store: HashMap::new(),
         }
     }
 
     pub fn get(&self, name: &str) -> Option<Object> {
-        if let Some(val) = self.store.borrow().get(name).cloned() {
+        if let Some(val) = self.store.get(name).cloned() {
             return Some(val);
         }
 
         if let Some(outer) = &self.outer {
-            outer.get(name)
+            outer.borrow().get(name)
         } else {
             None
         }
     }
 
-    pub fn set(&self, name: String, val: Object) {
-        self.store.borrow_mut().insert(name, val);
+    pub fn set(&mut self, name: String, val: Object) {
+        self.store.insert(name, val);
     }
 }

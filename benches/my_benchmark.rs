@@ -1,6 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 
-use monkey::{Compiler, Environment, Evaluator, Lexer, Parser, VM};
+use monkey::{self, Compiler, Environment, Lexer, Parser, VM};
 
 const INPUT: &str = "
 let fibonacci = fn(x) {
@@ -15,6 +15,21 @@ let fibonacci = fn(x) {
   }
 };
 ";
+
+fn eval_benchmark(c: &mut Criterion) {
+    let input = [INPUT, "fibonacci(20);"].concat();
+
+    c.bench_function("fib 20", |b| {
+        b.iter(|| {
+            let l = Lexer::new(input.as_bytes());
+            let mut p = Parser::new(l);
+            let program = p.parse_program();
+
+            let env = Environment::default();
+            monkey::eval(program, &env).unwrap();
+        })
+    });
+}
 
 fn bench_fibs(c: &mut Criterion) {
     let mut group = c.benchmark_group("Fibonacci");
@@ -43,13 +58,17 @@ fn bench_fibs(c: &mut Criterion) {
                 let mut p = Parser::new(l);
                 let program = p.parse_program();
 
-                let env = Environment::new(None);
-                program.eval(env).unwrap();
+                let env = Environment::default();
+                monkey::eval(program, &env).unwrap();
             });
         });
     }
     group.finish();
 }
 
-criterion_group!(benches, bench_fibs);
+criterion_group!(
+    benches,
+    eval_benchmark,
+    //  bench_fibs,
+);
 criterion_main!(benches);

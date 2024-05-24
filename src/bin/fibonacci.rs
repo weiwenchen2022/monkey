@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use clap::{Parser, ValueEnum};
-use monkey::{self, Compiler, Environment, Evaluator, Lexer, Object, VM};
+use monkey::{self, Compiler, Environment, Lexer, Object, VM};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -40,7 +40,7 @@ let fibonacci = fn(x) {
     }
   }
 };
-fibonacci(21);
+fibonacci(30);
 ";
 
 fn main() {
@@ -67,9 +67,9 @@ fn main() {
             result = machine.last_popped_stack_elem();
         }
         Engine::Eval => {
-            let env = Environment::new(None);
+            let env = Environment::default();
             let start = Instant::now();
-            result = program.eval(env).unwrap();
+            result = monkey::eval(program, &env).unwrap();
             duration = start.elapsed();
         }
     }

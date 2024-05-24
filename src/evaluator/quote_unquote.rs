@@ -1,14 +1,17 @@
-use super::Evaluator;
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use super::eval;
 use crate::ast::{self, Expression, Node, Tokenizer};
 use crate::object::Environment;
 use crate::object::Object;
 
-pub(crate) fn quote(node: Node, env: Environment) -> Object {
+pub(crate) fn quote(node: Node, env: &Environment) -> Object {
     let node = eval_unquote_calls(node, env);
     Object::Quote(node)
 }
 
-fn eval_unquote_calls(node: Node, env: Environment) -> Node {
+fn eval_unquote_calls(node: Node, env: &Environment) -> Node {
     ast::modify(node, move |mut node| {
         if !is_unquote_call(&node) {
             return node;
@@ -26,7 +29,7 @@ fn eval_unquote_calls(node: Node, env: Environment) -> Node {
         }
 
         let arg = arguments.pop().unwrap();
-        let unquoted = arg.eval(env.clone()).unwrap();
+        let unquoted = eval(arg, env).unwrap();
         unquoted.into()
     })
 }

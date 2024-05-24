@@ -1,7 +1,9 @@
 #![allow(unused_imports)]
 
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::rc::Rc;
 
 use crate::ast::{Expression, Node, Program, Statement};
@@ -12,21 +14,112 @@ mod builtins;
 
 pub type Result<T> = std::result::Result<T, String>;
 
-pub trait Evaluator {
-    fn eval(self, env: Environment) -> Result<Object>;
-}
+pub fn eval<N: Into<Node>>(node: N, env: &Environment) -> Result<Object> {
+    match node.into() {
+        Node::Program(program) => eval_program(program, env),
 
-impl Evaluator for Program {
-    fn eval(self, env: Environment) -> Result<Object> {
-        eval_program(self, env)
+        // Statements
+        Node::Statement(Statement::Expression { expression, .. }) => eval(expression, env),
+        Node::Statement(block @ Statement::Block { .. }) => eval_block_statement(block, env),
+        Node::Statement(Statement::Return { return_value, .. }) => {
+            let val = eval(return_value, env)?;
+            Ok(Object::ReturnValue(Box::new(val)))
+        }
+        Node::Statement(Statement::Let { name, value, .. }) => {
+            let val = eval(value, env)?;
+            let Expression::Identifier { value: name, .. } = name else {
+                panic!("not identifier expression got {name:?}");
+            };
+            env.borrow_mut().set(name, val);
+            Ok(Object::Null)
+        }
+
+        // Expressions
+        Node::Expression(Expression::IntegerLiteral { value, .. }) => Ok(Object::Integer(value)),
+        Node::Expression(Expression::Boolean { value, .. }) => Ok(Object::Boolean(value)),
+
+        Node::Expression(Expression::Prefix {
+            operator, right, ..
+        }) => {
+            let right = eval(*right, env)?;
+            eval_prefix_expression(&operator, right)
+        }
+        Node::Expression(Expression::Infix {
+            left,
+            operator,
+            right,
+            ..
+        }) => {
+            let left = eval(*left, env)?;
+            let right = eval(*right, env)?;
+            eval_infix_expression(&operator, left, right)
+        }
+
+        Node::Expression(Expression::If {
+            condition,
+            consequence,
+            alternative,
+            ..
+        }) => {
+            let condition = eval(*condition, env)?;
+            if condition.into() {
+                eval(*consequence, env)
+            } else if let Some(alternative) = alternative {
+                eval(*alternative, env)
+            } else {
+                Ok(Object::Null)
+            }
+        }
+
+        Node::Expression(Expression::Identifier { value: name, .. }) => eval_identifier(&name, env),
+
+        Node::Expression(Expression::FunctionLiteral {
+            parameters, body, ..
+        }) => Ok(Object::Function {
+            parameters,
+            body: *body,
+            env: Rc::clone(env),
+        }),
+        Node::Expression(Expression::Call {
+            function,
+            mut arguments,
+            ..
+        }) => {
+            use crate::ast::Tokenizer;
+
+            if "quote" == function.token_literal() {
+                return Ok(quote(Node::Expression(arguments.pop().unwrap()), env));
+            }
+
+            let function = eval(*function, env)?;
+            let args = eval_expressions(arguments, env)?;
+            apply_function(function, args)
+        }
+
+        Node::Expression(Expression::StringLiteral { value, .. }) => Ok(value.into()),
+
+        Node::Expression(Expression::ArrayLiteral { elements, .. }) => {
+            let elements = eval_expressions(elements, env)?;
+            Ok(elements.into())
+        }
+
+        Node::Expression(Expression::Index { left, index, .. }) => {
+            let left = eval(*left, env)?;
+            let index = eval(*index, env)?;
+            eval_index_expression(left, index)
+        }
+
+        Node::Expression(Expression::HashLiteral { pairs, .. }) => eval_hash_literal(pairs, env),
+
+        node => unreachable!("{node}"),
     }
 }
 
-fn eval_program(program: Program, env: Environment) -> Result<Object> {
+fn eval_program(program: Program, env: &Environment) -> Result<Object> {
     let mut result = Object::Null;
 
     for statement in program.statements {
-        result = statement.eval(env.clone())?;
+        result = eval(statement, env)?;
 
         if let Object::ReturnValue(v) = result {
             return Ok(*v);
@@ -36,35 +129,13 @@ fn eval_program(program: Program, env: Environment) -> Result<Object> {
     Ok(result)
 }
 
-// Statements
-impl Evaluator for Statement {
-    fn eval(self, env: Environment) -> Result<Object> {
-        match self {
-            Statement::Expression { expression, .. } => expression.eval(env),
-            Statement::Block { .. } => eval_blockstatement(self, env),
-            Statement::Return { return_value, .. } => {
-                let val = return_value.eval(env)?;
-                Ok(Object::ReturnValue(Box::new(val)))
-            }
-            Statement::Let { name, value, .. } => {
-                let val = value.eval(env.clone())?;
-                let Expression::Identifier { value: name, .. } = name else {
-                    panic!("not identifier expression got {name:?}");
-                };
-                env.set(name, val.clone());
-                Ok(Object::Null)
-            }
-        }
-    }
-}
-
-fn eval_blockstatement(block: Statement, env: Environment) -> Result<Object> {
+fn eval_block_statement(block: Statement, env: &Environment) -> Result<Object> {
     match block {
         Statement::Block { statements, .. } => {
             let mut result = Object::Null;
 
             for statement in statements {
-                result = statement.eval(env.clone())?;
+                result = eval(statement, env)?;
                 if let Object::ReturnValue(_) = result {
                     return Ok(result);
                 }
@@ -72,108 +143,20 @@ fn eval_blockstatement(block: Statement, env: Environment) -> Result<Object> {
 
             Ok(result)
         }
-        _ => panic!("not block statement got {block:?}"),
+        _ => unreachable!("not block statement got {block:?}"),
     }
 }
 
-// Expressions
-impl Evaluator for Expression {
-    fn eval(self, env: Environment) -> Result<Object> {
-        match self {
-            Expression::IntegerLiteral { value, .. } => Ok(Object::Integer(value)),
-            Expression::Boolean { value, .. } => Ok(Object::Boolean(value)),
-
-            Expression::Prefix {
-                operator, right, ..
-            } => {
-                let right = right.eval(env)?;
-                eval_prefix_expression(&operator, right)
-            }
-
-            Expression::Infix {
-                left,
-                operator,
-                right,
-                ..
-            } => {
-                let left = left.eval(env.clone())?;
-                let right = right.eval(env)?;
-                eval_infix_expression(&operator, left, right)
-            }
-
-            Expression::If {
-                condition,
-                consequence,
-                alternative,
-                ..
-            } => {
-                let condition = condition.eval(env.clone())?;
-                if condition.into() {
-                    consequence.eval(env)
-                } else if let Some(alternative) = alternative {
-                    alternative.eval(env)
-                } else {
-                    Ok(Object::Null)
-                }
-            }
-
-            Expression::Identifier { value: name, .. } => eval_identifier(&name, env),
-
-            Expression::FunctionLiteral {
-                parameters, body, ..
-            } => Ok(Object::Function {
-                parameters,
-                body: *body,
-                env,
-            }),
-
-            Expression::Call {
-                function,
-                mut arguments,
-                ..
-            } => {
-                use crate::ast::Tokenizer;
-
-                if "quote" == (*function).token_literal() {
-                    return Ok(quote(Node::Expression(arguments.pop().unwrap()), env));
-                }
-
-                let function = function.eval(env.clone())?;
-                let args = eval_expressions(arguments, env)?;
-
-                apply_function(function, args)
-            }
-
-            Expression::StringLiteral { value, .. } => Ok(value.into()),
-
-            Expression::ArrayLiteral { elements, .. } => {
-                let elements = eval_expressions(elements, env)?;
-                Ok(elements.into())
-            }
-
-            Expression::Index { left, index, .. } => {
-                let left = left.eval(env.clone())?;
-                let index = index.eval(env.clone())?;
-                eval_index_expression(left, index)
-            }
-
-            Expression::HashLiteral { pairs, .. } => eval_hash_literal(pairs, env),
-
-            _ => Ok(Object::Null),
-        }
-    }
-}
-
-fn eval_hash_literal(nodes: HashMap<Expression, Expression>, env: Environment) -> Result<Object> {
+fn eval_hash_literal(nodes: HashMap<Expression, Expression>, env: &Environment) -> Result<Object> {
     let mut pairs = HashMap::with_capacity(nodes.len());
 
     for (key_node, value_node) in nodes {
-        let key = key_node.eval(env.clone())?;
+        let key = eval(key_node, env)?;
         if !key.is_hashable() {
             return error!("unusable as hash key: {}", key.ty());
         }
 
-        let value = value_node.eval(env.clone())?;
+        let value = eval(value_node, env)?;
 
         pairs.insert(key, value);
     }
@@ -214,11 +197,6 @@ fn eval_array_index_expression(array: Object, index: Object) -> Result<Object> {
         .get(index as usize)
         .cloned()
         .unwrap_or(Object::Null))
-    // if index < 0 || index >= elements.len() as i64 {
-    //     Ok(Object::Null)
-    // } else {
-    //     Ok(elements[index as usize].clone())
-    // }
 }
 
 fn apply_function(f: Object, args: Vec<Object>) -> Result<Object> {
@@ -229,7 +207,7 @@ fn apply_function(f: Object, args: Vec<Object>) -> Result<Object> {
             env,
         } => {
             let extend_env = extend_function_env(env, parameters, args);
-            let evaluated = body.eval(extend_env)?;
+            let evaluated = eval(body, &extend_env)?;
             unwrap_return_value(evaluated)
         }
 
@@ -244,7 +222,8 @@ fn extend_function_env(
     parameters: Vec<Expression>,
     mut args: Vec<Object>,
 ) -> Environment {
-    let env = Environment::new(Some(Box::new(env)));
+    use crate::object::environment::_Environment;
+    let mut env = _Environment::new(Some(env));
 
     for (param_idx, param) in parameters.into_iter().enumerate() {
         let Expression::Identifier { value: name, .. } = param else {
@@ -253,7 +232,7 @@ fn extend_function_env(
         env.set(name, std::mem::replace(&mut args[param_idx], Object::Null));
     }
 
-    env
+    Rc::new(RefCell::new(env))
 }
 
 fn unwrap_return_value(obj: Object) -> Result<Object> {
@@ -264,12 +243,12 @@ fn unwrap_return_value(obj: Object) -> Result<Object> {
     }
 }
 
-fn eval_expressions(exps: Vec<Expression>, env: Environment) -> Result<Vec<Object>> {
-    exps.into_iter().map(|e| e.eval(env.clone())).collect()
+fn eval_expressions(exps: Vec<Expression>, env: &Environment) -> Result<Vec<Object>> {
+    exps.into_iter().map(|e| eval(e, env)).collect()
 }
 
-fn eval_identifier(name: &str, env: Environment) -> Result<Object> {
-    if let Some(val) = env.get(name) {
+fn eval_identifier(name: &str, env: &Environment) -> Result<Object> {
+    if let Some(val) = env.borrow().get(name) {
         return Ok(val);
     }
 
