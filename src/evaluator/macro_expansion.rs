@@ -128,7 +128,7 @@ fn add_macro(stmt: Statement, env: &Environment) {
         Object::Macro {
             parameters,
             body: *body,
-            env: Rc::clone(&env),
+            env: Rc::clone(env),
         },
     );
 }
