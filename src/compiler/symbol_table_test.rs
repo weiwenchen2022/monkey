@@ -430,7 +430,7 @@ fn resolve_unresolvable_free() {
         let result = second_local
             .borrow_mut()
             .resolve(&sym.name)
-            .expect(&format!("name {} not resolvable", sym.name));
+            .unwrap_or_else(|| panic!("name {} not resolvable", sym.name));
         assert_eq!(sym, &result);
     }
 
