@@ -52,6 +52,7 @@ impl Compiler {
         compiler
     }
 
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         let main_scope = CompilationScope::default();
         let symbol_table = Rc::new(RefCell::new(SymbolTable::new(None)));
@@ -74,9 +75,10 @@ impl Compiler {
 
         match node {
             Node::Program(program) => {
-                for s in program.statements {
-                    self.compile(s)?;
-                }
+                program
+                    .statements
+                    .into_iter()
+                    .try_for_each(|s| self.compile(s))?;
             }
             Node::Statement(Statement::Expression { expression, .. }) => {
                 self.compile(expression)?;
@@ -203,9 +205,8 @@ impl Compiler {
 
             Node::Expression(Expression::ArrayLiteral { elements, .. }) => {
                 let nelements = elements.len();
-                for el in elements {
-                    self.compile(el)?;
-                }
+                elements.into_iter().try_for_each(|el| self.compile(el))?;
+
                 self.emit(Opcode::Array, &[nelements as i64]);
             }
 
@@ -214,10 +215,10 @@ impl Compiler {
                 pairs.sort_by(|(k1, _), (k2, _)| k1.to_string().cmp(&k2.to_string()));
 
                 let n = pairs.len();
-                for (k, v) in pairs {
+                pairs.into_iter().try_for_each(|(k, v)| {
                     self.compile(k)?;
-                    self.compile(v)?;
-                }
+                    self.compile(v)
+                })?;
 
                 self.emit(Opcode::Hash, &[n as i64 * 2]);
             }
@@ -241,12 +242,15 @@ impl Compiler {
                 }
 
                 let num_parameters = parameters.len() as u8;
-                parameters.into_iter().for_each(|p| {
-                    let Expression::Identifier { value: name, .. } = p else {
-                        panic!();
-                    };
-                    self.symbol_table.borrow_mut().define(name);
-                });
+                if !parameters.is_empty() {
+                    let mut symbol_table = self.symbol_table.borrow_mut();
+                    parameters.into_iter().for_each(|p| {
+                        let Expression::Identifier { value: name, .. } = p else {
+                            panic!("not identifier");
+                        };
+                        symbol_table.define(name);
+                    });
+                }
 
                 self.compile(*body)?;
 
@@ -357,7 +361,7 @@ impl Compiler {
         if self.current_instructions().is_empty() {
             return false;
         }
-        matches!(self.scopes[self.scope_index].last_instruction, EmittedInstruction { opcode , .. } if  op == opcode)
+        matches!(&self.scopes[self.scope_index].last_instruction, &EmittedInstruction { opcode , .. } if op == opcode)
     }
 
     fn remove_last_pop(&mut self) {

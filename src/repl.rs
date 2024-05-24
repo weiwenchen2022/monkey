@@ -11,6 +11,7 @@ use crate::vm::{self, VM};
 
 const PROMT: &str = ">> ";
 
+#[allow(clippy::assigning_clones)]
 pub fn start<R: Read, W: Write>(input: R, mut output: W) -> Result<(), Box<dyn Error + 'static>> {
     let mut lines = BufReader::new(input).lines();
 
@@ -42,7 +43,6 @@ pub fn start<R: Read, W: Write>(input: R, mut output: W) -> Result<(), Box<dyn E
 
         let mut comp = Compiler::new_with_state(Rc::clone(&symbol_table), constants);
         if let Err(err) = comp.compile(program) {
-            // symbol_table = comp.symbol_table;
             constants = comp.constants;
 
             writeln!(&mut output, "Woops! Compilation failed:\n {err}")?;
@@ -50,7 +50,6 @@ pub fn start<R: Read, W: Write>(input: R, mut output: W) -> Result<(), Box<dyn E
         }
 
         let code = comp.bytecode();
-        // symbol_table = comp.symbol_table;
 
         constants = code.constants.clone();
 

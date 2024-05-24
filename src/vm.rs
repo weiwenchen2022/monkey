@@ -44,7 +44,7 @@ impl VM {
         };
         let main_closure = Object::Closure {
             f: Box::new(main_fn),
-            free: vec![],
+            free: Vec::new(),
         };
         let main_frame = Frame::new(main_closure, 0);
 
@@ -75,7 +75,7 @@ impl VM {
 
     fn pop_frame(&mut self) -> Frame {
         self.frames_index -= 1;
-        std::mem::take(&mut self.frames[self.frames_index])
+        mem::take(&mut self.frames[self.frames_index])
     }
 
     #[allow(dead_code)]
@@ -315,7 +315,7 @@ impl VM {
             .into());
         }
 
-        let frame = Frame::new(cl.clone(), self.sp - num_args);
+        let frame = Frame::new(cl, self.sp - num_args);
         self.sp = frame.base_pointer + num_locals as usize;
         self.push_frame(frame);
 
@@ -326,7 +326,7 @@ impl VM {
         let args = self.stack[self.sp - num_args..self.sp].iter_mut().fold(
             Vec::with_capacity(num_args),
             |mut args, arg| {
-                args.push(std::mem::replace(arg, Object::Null));
+                args.push(mem::replace(arg, Object::Null));
                 args
             },
         );
@@ -374,8 +374,8 @@ impl VM {
         let mut hashed = HashMap::with_capacity((end_index - start_index) / 2);
 
         for i in (start_index..end_index).step_by(2) {
-            let key = std::mem::replace(&mut self.stack[i], Object::Null);
-            let value = std::mem::replace(&mut self.stack[i + 1], Object::Null);
+            let key = mem::replace(&mut self.stack[i], Object::Null);
+            let value = mem::replace(&mut self.stack[i + 1], Object::Null);
 
             if !key.is_hashable() {
                 return Err(format!("unusable as hash key: {}", key.ty()).into());
@@ -388,10 +388,13 @@ impl VM {
     }
 
     fn build_array(&mut self, start_index: usize, end_index: usize) -> Object {
-        let mut elements = Vec::with_capacity(end_index - start_index);
-        for i in start_index..end_index {
-            elements.push(std::mem::replace(&mut self.stack[i], Object::Null));
-        }
+        let elements = self.stack[start_index..end_index].iter_mut().fold(
+            Vec::with_capacity(end_index - start_index),
+            |mut elements, elem| {
+                elements.push(mem::replace(elem, Object::Null));
+                elements
+            },
+        );
         Object::Array(elements.into())
     }
 

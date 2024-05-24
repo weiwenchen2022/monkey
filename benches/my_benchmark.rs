@@ -31,6 +31,26 @@ fn eval_benchmark(c: &mut Criterion) {
     });
 }
 
+fn vm_benchmark(c: &mut Criterion) {
+    let input = [INPUT, "fibonacci(30);"].concat();
+
+    c.bench_function("fib 30", |b| {
+        b.iter(|| {
+            let l = Lexer::new(input.as_bytes());
+            let mut p = Parser::new(l);
+            let program = p.parse_program();
+
+            let mut comp = Compiler::new();
+            comp.compile(program).expect("compiler error:");
+
+            let mut machine = VM::new(comp.bytecode());
+            machine.run().expect("vm error:");
+
+            machine.last_popped_stack_elem()
+        })
+    });
+}
+
 fn bench_fibs(c: &mut Criterion) {
     let mut group = c.benchmark_group("Fibonacci");
     for i in [20_i64, 21_i64].iter() {
@@ -68,7 +88,8 @@ fn bench_fibs(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    eval_benchmark,
+    // eval_benchmark,
+    vm_benchmark,
     //  bench_fibs,
 );
 criterion_main!(benches);
