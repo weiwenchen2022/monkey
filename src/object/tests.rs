@@ -66,6 +66,7 @@ fn integer_hashkey() {
 
 use std::hash::{BuildHasher, Hash, Hasher};
 
+#[allow(clippy::manual_hash_one)]
 fn compute_hash<B: BuildHasher, T: Hash>(builder: &B, value: &T) -> u64 {
     let mut hasher = builder.build_hasher();
     value.hash(&mut hasher);
