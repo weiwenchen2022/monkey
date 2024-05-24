@@ -11,6 +11,8 @@ pub enum Token {
     Int(String),    // 1343456
     String(String), // "foobar"
 
+    LineComment(String), // // line comment
+
     // Operators
     Assign,   // =
     Plus,     // +
@@ -67,6 +69,7 @@ impl fmt::Debug for Token {
             Token::Ident(_) => write!(f, "Ident"),
             Token::Int(_) => write!(f, "Int"),
             Token::String(_) => write!(f, "String"),
+            Token::LineComment(_) => write!(f, "LineComment"),
 
             Token::Assign => write!(f, "="),
             Token::Plus => write!(f, "+"),

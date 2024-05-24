@@ -41,7 +41,13 @@ impl<'a> Lexer<'a> {
                     Token::Bang
                 }
             }
-            b'/' => Token::Slash,
+            b'/' => {
+                if b'/' == self.peek_char() {
+                    Token::LineComment(self.read_line_comment())
+                } else {
+                    Token::Slash
+                }
+            }
             b'*' => Token::Asterisk,
 
             b'<' => Token::LT,
@@ -86,6 +92,20 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
+        String::from_utf8_lossy(&self.input[position..self.position]).into_owned()
+    }
+
+    fn read_line_comment(&mut self) -> String {
+        self.read_char();
+        let position = self.position + 1;
+
+        loop {
+            self.read_char();
+            if self.ch == b'\n' || self.ch == b'\0' {
+                break;
+            }
+        }
+
         String::from_utf8_lossy(&self.input[position..self.position]).into_owned()
     }
 
