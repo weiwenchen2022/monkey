@@ -141,7 +141,7 @@ fn eval_block_statement(block: BlockStatement, env: &Environment) -> Result<Obje
     Ok(result)
 }
 
-fn eval_hash_literal(nodes: HashMap<Expression, Expression>, env: &Environment) -> Result<Object> {
+fn eval_hash_literal(nodes: Vec<(Expression, Expression)>, env: &Environment) -> Result<Object> {
     let mut pairs = HashMap::with_capacity(nodes.len());
 
     for (key_node, value_node) in nodes {

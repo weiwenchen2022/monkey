@@ -54,12 +54,12 @@ fn vm_benchmark(c: &mut Criterion) {
 fn bench_fibs(c: &mut Criterion) {
     let mut group = c.benchmark_group("Fibonacci");
     for i in [20_i64, 21_i64].iter() {
-        group.bench_with_input(BenchmarkId::new("vm", i), i, |b, i| {
-            let input = [INPUT, &format!("fibonacci({i});")].concat();
-            b.iter(|| vm(&input));
-        });
+        // group.bench_with_input(BenchmarkId::new("vm", i), i, |b, i| {
+        //     let input = [INPUT, &format!("fibonacci({i});")].concat();
+        //     b.iter(|| vm(&input));
+        // });
 
-        group.bench_with_input(BenchmarkId::new("eval", i), i, |b, i| {
+        group.bench_with_input(BenchmarkId::new("eval ", i), i, |b, i| {
             let input = [INPUT, &format!("fibonacci({i});")].concat();
             b.iter(|| eval(&input));
         });
@@ -68,9 +68,8 @@ fn bench_fibs(c: &mut Criterion) {
 }
 
 criterion_group!(
-    benches,
-    vm_benchmark,
+    benches, // vm_benchmark,
     // eval_benchmark,
-    // bench_fibs,
+    bench_fibs,
 );
 criterion_main!(benches);

@@ -104,7 +104,7 @@ impl<'a> Parser<'a> {
         let mut value = self.parse_expression(LOWEST)?;
 
         if let Expression::FunctionLiteral { name: fn_name, .. } = &mut value {
-            *fn_name = name.value.clone();
+            fn_name.clone_from(&name.value);
         }
 
         if self.peek_token_is(&Token::Semicolon) {
@@ -205,7 +205,7 @@ impl<'a> Parser<'a> {
 
     fn parse_hash_literal(&mut self) -> Option<Expression> {
         let token = self.cur_token.clone();
-        let mut pairs: HashMap<Expression, Expression> = HashMap::new();
+        let mut pairs = Vec::new();
 
         while !self.peek_token_is(&Token::RBrace) {
             self.next_token();
@@ -218,7 +218,7 @@ impl<'a> Parser<'a> {
             self.next_token();
             let value = self.parse_expression(LOWEST)?;
 
-            pairs.insert(key, value);
+            pairs.push((key, value));
 
             if !self.peek_token_is(&Token::RBrace) && !self.expect_peek(Token::Comma) {
                 return None;

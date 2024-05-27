@@ -208,9 +208,6 @@ impl Compiler {
             }
 
             Node::Expression(Expression::HashLiteral { pairs, .. }) => {
-                let mut pairs: Vec<_> = pairs.into_iter().collect();
-                pairs.sort_by(|(k1, _), (k2, _)| k1.to_string().cmp(&k2.to_string()));
-
                 let n = pairs.len();
                 pairs.into_iter().try_for_each(|(k, v)| {
                     self.compile(k)?;

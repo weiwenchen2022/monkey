@@ -1,6 +1,5 @@
 use crate::token::Token;
 
-use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::hash::{Hash, Hasher};
 
@@ -203,7 +202,7 @@ pub enum Expression {
 
     HashLiteral {
         token: Token, // the '{' token
-        pairs: HashMap<Expression, Expression>,
+        pairs: Vec<(Expression, Expression)>,
     },
 
     MacroLiteral {
