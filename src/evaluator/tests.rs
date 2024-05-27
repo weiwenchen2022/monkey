@@ -1,7 +1,11 @@
 use std::{cell::RefCell, collections::HashMap, ops::Deref, rc::Rc};
 
 use super::eval;
-use crate::{lexer::Lexer, object::Environment, object::Object, parser::Parser};
+use crate::{
+    lexer::Lexer,
+    object::{Environment, Function, Object},
+    parser::Parser,
+};
 
 pub(crate) struct Test<'a, T> {
     pub(crate) input: &'a str,
@@ -384,18 +388,15 @@ fn function_object() {
     let input = "fn(x) { x + 2; };";
 
     let evaluated = test_eval(input);
-    let Object::Function {
-        parameters, body, ..
-    } = evaluated
-    else {
+    let Object::Function(f) = evaluated else {
         panic!("object is not Function. got {}", evaluated.ty());
     };
 
-    assert_eq!(1, parameters.len());
-    assert_eq!("x", parameters[0].to_string());
+    assert_eq!(1, f.parameters.len());
+    assert_eq!("x", f.parameters[0].to_string());
 
     let expected_body = "(x + 2)";
-    assert_eq!(expected_body, body.to_string());
+    assert_eq!(expected_body, f.body.to_string());
 }
 
 #[test]

@@ -32,11 +32,7 @@ pub enum Object {
 
     Error(String),
 
-    Function {
-        parameters: Vec<Identifier>,
-        body: BlockStatement,
-        env: Environment,
-    },
+    Function(Rc<Function>),
 
     String(Rc<String>),
 
@@ -62,6 +58,28 @@ pub enum Object {
         f: Box<Object>,
         free: Vec<Object>,
     },
+}
+
+pub struct Function {
+    pub(crate) parameters: Vec<Identifier>,
+    pub(crate) body: BlockStatement,
+    pub(crate) env: Environment,
+}
+
+impl Display for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "fn")?;
+        write!(f, "(")?;
+        self.parameters.iter().enumerate().try_for_each(|(i, p)| {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{p}")
+        })?;
+        writeln!(f, ") {{")?;
+        write!(f, "{}", self.body)?;
+        write!(f, "\n}}")
+    }
 }
 
 impl From<HashMap<Object, Object>> for Object {
@@ -155,21 +173,7 @@ impl Display for Object {
             Object::Boolean(b) => b.fmt(f),
             Object::ReturnValue(v) => v.fmt(f),
             Object::Error(e) => write!(f, "error: {e}"),
-            Object::Function {
-                parameters, body, ..
-            } => {
-                write!(f, "fn")?;
-                write!(f, "(")?;
-                parameters.iter().enumerate().try_for_each(|(i, p)| {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{p}")
-                })?;
-                writeln!(f, ") {{")?;
-                write!(f, "{}", body)?;
-                write!(f, "\n}}")
-            }
+            Object::Function(function) => function.fmt(f),
             Object::String(s) => s.fmt(f),
             Object::Builtin(_) => "builtin function".fmt(f),
             Object::Array(elements) => {
