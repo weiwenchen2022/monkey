@@ -29,7 +29,7 @@ fn eval(input: &str) -> Object {
 
 fn eval_benchmark(c: &mut Criterion) {
     let input = [INPUT, "fibonacci(20);"].concat();
-    c.bench_function("fib 20", |b| b.iter(|| eval(&input)));
+    c.bench_function("eval fib 20", |b| b.iter(|| eval(&input)));
 }
 
 fn vm(input: &str) -> Object {
@@ -48,16 +48,16 @@ fn vm(input: &str) -> Object {
 
 fn vm_benchmark(c: &mut Criterion) {
     let input = [INPUT, "fibonacci(20);"].concat();
-    c.bench_function("fib 20", |b| b.iter(|| vm(&input)));
+    c.bench_function("vm fib 20", |b| b.iter(|| vm(&input)));
 }
 
 fn bench_fibs(c: &mut Criterion) {
     let mut group = c.benchmark_group("Fibonacci");
     for i in [20_i64, 21_i64].iter() {
-        // group.bench_with_input(BenchmarkId::new("vm", i), i, |b, i| {
-        //     let input = [INPUT, &format!("fibonacci({i});")].concat();
-        //     b.iter(|| vm(&input));
-        // });
+        group.bench_with_input(BenchmarkId::new("vm", i), i, |b, i| {
+            let input = [INPUT, &format!("fibonacci({i});")].concat();
+            b.iter(|| vm(&input));
+        });
 
         group.bench_with_input(BenchmarkId::new("eval ", i), i, |b, i| {
             let input = [INPUT, &format!("fibonacci({i});")].concat();
@@ -67,9 +67,5 @@ fn bench_fibs(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    benches, // vm_benchmark,
-    // eval_benchmark,
-    bench_fibs,
-);
+criterion_group!(benches, vm_benchmark, eval_benchmark, bench_fibs,);
 criterion_main!(benches);
