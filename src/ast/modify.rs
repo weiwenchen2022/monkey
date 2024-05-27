@@ -1,4 +1,4 @@
-use super::{Expression, Node, Program, Statement};
+use super::{BlockStatement, Expression, Node, Program, Statement};
 
 pub(crate) fn modify<M>(node: Node, mut modifier: M) -> Node
 where
@@ -99,29 +99,31 @@ where
                 panic!();
             };
 
-            let Node::Statement(consequence) =
-                modify(Node::Statement(*consequence), modifier.clone())
-            else {
+            let Node::Statement(Statement::Block(consequence)) = modify(
+                Node::Statement(Statement::Block(consequence)),
+                modifier.clone(),
+            ) else {
                 panic!()
             };
 
             let alternative = alternative.map(|alternative| {
-                let Node::Statement(alternative) =
-                    modify(Node::Statement(*alternative), modifier.clone())
-                else {
+                let Node::Statement(Statement::Block(alternative)) = modify(
+                    Node::Statement(Statement::Block(alternative)),
+                    modifier.clone(),
+                ) else {
                     panic!()
                 };
-                Box::new(alternative)
+                alternative
             });
 
             Node::Expression(Expression::If {
                 token,
                 condition: Box::new(condition),
-                consequence: Box::new(consequence),
+                consequence,
                 alternative,
             })
         }
-        Node::Statement(Statement::Block { token, statements }) => {
+        Node::Statement(Statement::Block(BlockStatement { token, statements })) => {
             let statements = statements
                 .into_iter()
                 .map(|statement| {
@@ -133,7 +135,7 @@ where
                     statement
                 })
                 .collect();
-            Node::Statement(Statement::Block { token, statements })
+            Node::Statement(Statement::Block(BlockStatement { token, statements }))
         }
         Node::Statement(Statement::Return {
             token,
@@ -167,23 +169,26 @@ where
             let parameters = parameters
                 .into_iter()
                 .map(|parameter| {
-                    let Node::Expression(parameter) =
-                        modify(Node::Expression(parameter), modifier.clone())
-                    else {
+                    let Node::Expression(Expression::Identifier(parameter)) = modify(
+                        Node::Expression(Expression::Identifier(parameter)),
+                        modifier.clone(),
+                    ) else {
                         panic!();
                     };
                     parameter
                 })
                 .collect();
 
-            let Node::Statement(body) = modify(Node::Statement(*body), modifier.clone()) else {
+            let Node::Statement(Statement::Block(body)) =
+                modify(Node::Statement(Statement::Block(body)), modifier.clone())
+            else {
                 panic!();
             };
 
             Node::Expression(Expression::FunctionLiteral {
                 token,
                 parameters,
-                body: Box::new(body),
+                body,
                 name,
             })
         }
@@ -230,7 +235,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::modify;
-    use crate::ast::{Expression, Node, Program, Statement};
+    use crate::ast::{BlockStatement, Expression, Identifier, Node, Program, Statement};
     use crate::token::Token;
 
     #[test]
@@ -344,38 +349,38 @@ mod tests {
                 input: Node::Expression(Expression::If {
                     token: Token::IF,
                     condition: Box::new(one()),
-                    consequence: Box::new(Statement::Block {
+                    consequence: BlockStatement {
+                        token: Token::LBrace,
+                        statements: vec![Statement::Expression {
+                            token: Token::Int("1".to_string()),
+                            expression: one(),
+                        }],
+                    },
+                    alternative: Some(BlockStatement {
                         token: Token::LBrace,
                         statements: vec![Statement::Expression {
                             token: Token::Int("1".to_string()),
                             expression: one(),
                         }],
                     }),
-                    alternative: Some(Box::new(Statement::Block {
-                        token: Token::LBrace,
-                        statements: vec![Statement::Expression {
-                            token: Token::Int("1".to_string()),
-                            expression: one(),
-                        }],
-                    })),
                 }),
                 expected: Node::Expression(Expression::If {
                     token: Token::IF,
                     condition: Box::new(two()),
-                    consequence: Box::new(Statement::Block {
+                    consequence: BlockStatement {
+                        token: Token::LBrace,
+                        statements: vec![Statement::Expression {
+                            token: Token::Int("2".to_string()),
+                            expression: two(),
+                        }],
+                    },
+                    alternative: Some(BlockStatement {
                         token: Token::LBrace,
                         statements: vec![Statement::Expression {
                             token: Token::Int("2".to_string()),
                             expression: two(),
                         }],
                     }),
-                    alternative: Some(Box::new(Statement::Block {
-                        token: Token::LBrace,
-                        statements: vec![Statement::Expression {
-                            token: Token::Int("2".to_string()),
-                            expression: two(),
-                        }],
-                    })),
                 }),
             },
             // return statement
@@ -393,7 +398,7 @@ mod tests {
             Test {
                 input: Node::Statement(Statement::Let {
                     token: Token::Let,
-                    name: Expression::Identifier {
+                    name: Identifier {
                         token: Token::Ident("a".to_string()),
                         value: "a".to_string(),
                     },
@@ -401,7 +406,7 @@ mod tests {
                 }),
                 expected: Node::Statement(Statement::Let {
                     token: Token::Let,
-                    name: Expression::Identifier {
+                    name: Identifier {
                         token: Token::Ident("a".to_string()),
                         value: "a".to_string(),
                     },
@@ -413,25 +418,25 @@ mod tests {
                 input: Node::Expression(Expression::FunctionLiteral {
                     token: Token::Function,
                     parameters: vec![],
-                    body: Box::new(Statement::Block {
+                    body: BlockStatement {
                         token: Token::LBrace,
                         statements: vec![Statement::Expression {
                             token: Token::Int("1".to_string()),
                             expression: one(),
                         }],
-                    }),
+                    },
                     name: String::new(),
                 }),
                 expected: Node::Expression(Expression::FunctionLiteral {
                     token: Token::Function,
                     parameters: vec![],
-                    body: Box::new(Statement::Block {
+                    body: BlockStatement {
                         token: Token::LBrace,
                         statements: vec![Statement::Expression {
                             token: Token::Int("2".to_string()),
                             expression: two(),
                         }],
-                    }),
+                    },
                     name: String::new(),
                 }),
             },

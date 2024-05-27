@@ -1,4 +1,4 @@
-use crate::ast::{Expression, Program, Statement};
+use crate::ast::{BlockStatement, Expression, Identifier, Program, Statement};
 use crate::lexer::Lexer;
 use crate::token::Token;
 
@@ -90,9 +90,9 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        let name = Expression::Identifier {
+        let name = Identifier {
             token: self.cur_token.clone(),
-            value: self.cur_token.to_string(),
+            value: self.cur_token.literal().to_string(),
         };
 
         if !self.expect_peek(Token::Assign) {
@@ -104,11 +104,7 @@ impl<'a> Parser<'a> {
         let mut value = self.parse_expression(LOWEST)?;
 
         if let Expression::FunctionLiteral { name: fn_name, .. } = &mut value {
-            *fn_name = if let Expression::Identifier { value: name, .. } = &name {
-                name.clone()
-            } else {
-                unreachable!();
-            };
+            *fn_name = name.value.clone();
         }
 
         if self.peek_token_is(&Token::Semicolon) {
@@ -203,7 +199,7 @@ impl<'a> Parser<'a> {
         Some(Expression::MacroLiteral {
             token,
             parameters,
-            body: Box::new(body),
+            body,
         })
     }
 
@@ -290,12 +286,12 @@ impl<'a> Parser<'a> {
         Some(Expression::FunctionLiteral {
             token,
             parameters,
-            body: Box::new(body),
+            body,
             name: String::new(),
         })
     }
 
-    fn parse_function_parameters(&mut self) -> Option<Vec<Expression>> {
+    fn parse_function_parameters(&mut self) -> Option<Vec<Identifier>> {
         let mut identifiers = vec![];
 
         if self.peek_token_is(&Token::RParen) {
@@ -305,18 +301,18 @@ impl<'a> Parser<'a> {
 
         self.next_token();
 
-        let ident = Expression::Identifier {
+        let ident = Identifier {
             token: self.cur_token.clone(),
-            value: self.cur_token.to_string(),
+            value: self.cur_token.literal().to_string(),
         };
         identifiers.push(ident);
 
         while self.peek_token_is(&Token::Comma) {
             self.next_token();
             self.next_token();
-            let ident = Expression::Identifier {
+            let ident = Identifier {
                 token: self.cur_token.clone(),
-                value: self.cur_token.to_string(),
+                value: self.cur_token.literal().to_string(),
             };
             identifiers.push(ident);
         }
@@ -356,7 +352,7 @@ impl<'a> Parser<'a> {
                 return None;
             }
 
-            Some(Box::new(self.parse_block_statement()))
+            Some(self.parse_block_statement())
         } else {
             None
         };
@@ -364,12 +360,12 @@ impl<'a> Parser<'a> {
         Some(Expression::If {
             token,
             condition: Box::new(codition),
-            consequence: Box::new(consequence),
+            consequence,
             alternative,
         })
     }
 
-    fn parse_block_statement(&mut self) -> Statement {
+    fn parse_block_statement(&mut self) -> BlockStatement {
         let token = self.cur_token.clone();
 
         let mut statements = Vec::new();
@@ -383,7 +379,7 @@ impl<'a> Parser<'a> {
             self.next_token();
         }
 
-        Statement::Block { token, statements }
+        BlockStatement { token, statements }
     }
 
     fn parse_grouped_expression(&mut self) -> Option<Expression> {
@@ -490,10 +486,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_identifier(&mut self) -> Option<Expression> {
-        Some(Expression::Identifier {
+        Some(Expression::Identifier(Identifier {
             token: self.cur_token.clone(),
-            value: self.cur_token.to_string(),
-        })
+            value: self.cur_token.literal().to_string(),
+        }))
     }
 
     fn parse_boolean(&mut self) -> Option<Expression> {

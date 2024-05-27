@@ -3,9 +3,8 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    ast::{self, Expression, Node, Program, Statement},
-    object::Environment,
-    object::Object,
+    ast::{self, Expression, Identifier, Node, Program, Statement},
+    object::{Environment, Object},
 };
 
 use super::eval;
@@ -46,7 +45,7 @@ pub(crate) fn expand_macros(program: Program, env: &Environment) -> Node {
         let Object::Macro { body, .. } = obj else {
             panic!();
         };
-        let evaluated = eval(body, &eval_env).unwrap();
+        let evaluated = eval(Statement::Block(body), &eval_env).unwrap();
 
         let Object::Quote(node) = evaluated else {
             panic!("we only support returning AST-nodes from macros");
@@ -57,7 +56,7 @@ pub(crate) fn expand_macros(program: Program, env: &Environment) -> Node {
 }
 
 fn is_macro_call(function: &Expression, env: &Environment) -> (Object, bool) {
-    let Expression::Identifier { value, .. } = function else {
+    let Expression::Identifier(Identifier { value, .. }) = function else {
         return (Object::Null, false);
     };
 
@@ -93,10 +92,7 @@ fn extend_macro_env(obj: Object, mut args: Vec<Object>) -> Environment {
     let mut args = args.drain(..);
 
     for param in parameters {
-        let Expression::Identifier { value: name, .. } = param else {
-            panic!();
-        };
-        extended.set(name, args.next().unwrap());
+        extended.set(param.value, args.next().unwrap());
     }
     Rc::new(RefCell::new(extended))
 }
@@ -119,15 +115,11 @@ fn add_macro(stmt: Statement, env: &Environment) {
         panic!();
     };
 
-    let Expression::Identifier { value: name, .. } = name else {
-        panic!();
-    };
-
     env.borrow_mut().set(
-        name,
+        name.value,
         Object::Macro {
             parameters,
-            body: *body,
+            body,
             env: Rc::clone(env),
         },
     );

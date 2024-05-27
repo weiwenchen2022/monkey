@@ -1,4 +1,4 @@
-use crate::ast::{Expression, Node, Statement};
+use crate::ast::{BlockStatement, Expression, Identifier, Node, Statement};
 use crate::code::{self, Instructions, Opcode};
 use crate::object::{self, Object};
 
@@ -143,7 +143,7 @@ impl Compiler {
                 // Emit an `OpJumpNotTruthy` with a bogus value
                 let jump_not_truthy_pos = self.emit(Opcode::JumpNotTruthy, &[i16::MAX as i64]);
 
-                self.compile(*consequence)?;
+                self.compile(Statement::Block(consequence))?;
 
                 if self.last_instruction_is(Opcode::Pop) {
                     self.remove_last_pop();
@@ -158,7 +158,7 @@ impl Compiler {
                 if alternative.is_none() {
                     self.emit(Opcode::Null, &[]);
                 } else {
-                    self.compile(*alternative.unwrap())?;
+                    self.compile(Statement::Block(alternative.unwrap()))?;
 
                     if self.last_instruction_is(Opcode::Pop) {
                         self.remove_last_pop();
@@ -169,17 +169,14 @@ impl Compiler {
                 self.change_operand(jump_pos, after_alternative_pos as i64);
             }
 
-            Node::Statement(Statement::Block { statements, .. }) => {
+            Node::Statement(Statement::Block(BlockStatement { statements, .. })) => {
                 for s in statements {
                     self.compile(s)?;
                 }
             }
 
             Node::Statement(Statement::Let { name, value, .. }) => {
-                let Expression::Identifier { value: name, .. } = name else {
-                    panic!("{name:?}");
-                };
-                let symbol = self.symbol_table.borrow_mut().define(name);
+                let symbol = self.symbol_table.borrow_mut().define(name.value);
 
                 self.compile(value)?;
 
@@ -190,7 +187,7 @@ impl Compiler {
                 }
             }
 
-            Node::Expression(Expression::Identifier { value: name, .. }) => {
+            Node::Expression(Expression::Identifier(Identifier { value: name, .. })) => {
                 let Some(symbol) = self.symbol_table.borrow_mut().resolve(&name) else {
                     return Err(format!("undefined variable {name}"));
                 };
@@ -245,14 +242,11 @@ impl Compiler {
                 if !parameters.is_empty() {
                     let mut symbol_table = self.symbol_table.borrow_mut();
                     parameters.into_iter().for_each(|p| {
-                        let Expression::Identifier { value: name, .. } = p else {
-                            panic!("not identifier");
-                        };
-                        symbol_table.define(name);
+                        symbol_table.define(p.value);
                     });
                 }
 
-                self.compile(*body)?;
+                self.compile(Statement::Block(body))?;
 
                 if self.last_instruction_is(Opcode::Pop) {
                     self.replace_last_pop_with_return();

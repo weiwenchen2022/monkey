@@ -5,14 +5,14 @@ fn display() {
     let program = Program {
         statements: vec![Statement::Let {
             token: Token::Let,
-            name: Expression::Identifier {
+            name: Identifier {
                 token: Token::Ident("myVar".to_string()),
                 value: "myVar".to_string(),
             },
-            value: Expression::Identifier {
+            value: Expression::Identifier(Identifier {
                 token: Token::Ident("anotherVar".to_string()),
                 value: "anotherVar".to_string(),
-            },
+            }),
         }],
     };
 

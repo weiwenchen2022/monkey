@@ -109,10 +109,10 @@ fn identifier_expression() {
     };
 
     assert_eq!("foobar", ident.token_literal());
-    let Expression::Identifier { value, .. } = ident else {
+    let Expression::Identifier(ident) = ident else {
         panic!("not identifier expression got {ident:?}");
     };
-    assert_eq!("foobar", value);
+    assert_eq!("foobar", ident.value);
 }
 
 #[test]
@@ -566,17 +566,12 @@ fn if_expression() {
         &(Box::new("y") as Any),
     );
 
-    let Statement::Block {
-        statements: consequence,
-        ..
-    } = consequence.as_ref()
-    else {
-        panic!("not block statement got {consequence:?}");
-    };
-
-    assert_eq!(1, consequence.len());
-    let Statement::Expression { expression, .. } = &consequence[0] else {
-        panic!("not expression statement got {:?}", consequence[0]);
+    assert_eq!(1, consequence.statements.len());
+    let Statement::Expression { expression, .. } = &consequence.statements[0] else {
+        panic!(
+            "not expression statement got {:?}",
+            consequence.statements[0]
+        );
     };
 
     test_identifier(expression, "x");
@@ -617,40 +612,37 @@ fn if_else_expression() {
         &(Box::new("y") as Any),
     );
 
-    let Statement::Block {
-        statements: consequence,
-        ..
-    } = consequence.as_ref()
-    else {
-        panic!("not block statement got  {consequence:?}");
-    };
-    assert_eq!(1, consequence.len());
+    // let Statement::Block {
+    //     statements: consequence,
+    //     ..
+    // } = consequence.as_ref()
+    // else {
+    //     panic!("not block statement got  {consequence:?}");
+    // };
+    assert_eq!(1, consequence.statements.len());
 
     let Statement::Expression {
         expression: consequence,
         ..
-    } = &consequence[0]
+    } = &consequence.statements[0]
     else {
-        panic!("not expression statement, got {:?}", consequence[0]);
+        panic!(
+            "not expression statement, got {:?}",
+            consequence.statements[0]
+        );
     };
 
     test_identifier(consequence, "x");
 
     assert!(alternative.is_some());
 
-    let Statement::Block {
-        statements: alternative,
-        ..
-    } = alternative.as_ref().unwrap().as_ref()
-    else {
-        panic!("not block statemnt got {:?}", alternative);
-    };
+    let alternative = alternative.as_ref().unwrap();
 
-    assert_eq!(1, alternative.len());
+    assert_eq!(1, alternative.statements.len());
     let Statement::Expression {
         expression: alternative,
         ..
-    } = &alternative[0]
+    } = &alternative.statements[0]
     else {
         panic!("not expression statement");
     };
@@ -686,15 +678,18 @@ fn function_literal_parsing() {
     };
 
     assert_eq!(2, parameters.len());
-    test_literal_expression(&parameters[0], &(Box::new("x") as Any));
-    test_literal_expression(&parameters[1], &(Box::new("y") as Any));
+    test_literal_expression(
+        &Expression::Identifier(parameters[0].clone()),
+        &(Box::new("x") as Any),
+    );
+    test_literal_expression(
+        &Expression::Identifier(parameters[1].clone()),
+        &(Box::new("y") as Any),
+    );
 
-    let Statement::Block { statements, .. } = body.as_ref() else {
-        panic!("not block statement got {body:?}");
-    };
-    assert_eq!(1, statements.len());
+    assert_eq!(1, body.statements.len());
 
-    let body_stmt = &statements[0];
+    let body_stmt = &body.statements[0];
     let Statement::Expression { expression, .. } = body_stmt else {
         panic!("not expression statement got {body_stmt:?}");
     };
@@ -749,7 +744,10 @@ fn function_parameter_parsing() {
         assert_eq!(tt.expected_params.len(), parameters.len());
 
         for (i, &ident) in tt.expected_params.iter().enumerate() {
-            test_literal_expression(&parameters[i], &(Box::new(ident) as Any));
+            test_literal_expression(
+                &Expression::Identifier(parameters[i].clone()),
+                &(Box::new(ident) as Any),
+            );
         }
     }
 }
@@ -1187,18 +1185,21 @@ fn parsing_marco_literal() {
 
     assert_eq!(2, parameters.len());
 
-    test_literal_expression(&parameters[0], &(Box::new("x") as Any));
-    test_literal_expression(&parameters[1], &(Box::new("y") as Any));
+    test_literal_expression(
+        &Expression::Identifier(parameters[0].clone()),
+        &(Box::new("x") as Any),
+    );
+    test_literal_expression(
+        &Expression::Identifier(parameters[1].clone()),
+        &(Box::new("y") as Any),
+    );
 
-    let Statement::Block { statements, .. } = body.as_ref() else {
-        panic!("body not block statement {body:?}")
-    };
-    assert_eq!(1, statements.len());
+    assert_eq!(1, body.statements.len());
 
-    let Statement::Expression { expression, .. } = &statements[0] else {
+    let Statement::Expression { expression, .. } = &body.statements[0] else {
         panic!(
             "macro body stmt is not ast.ExpressionStatement. got={:?}",
-            &statements[0]
+            &body.statements[0]
         );
     };
     test_infix_expression(
@@ -1288,11 +1289,11 @@ fn test_integer_literal(il: &Expression, value: i64) {
 }
 
 fn test_identifier(exp: &Expression, value: &str) {
-    let Expression::Identifier { value: ident, .. } = exp else {
+    let Expression::Identifier(ident) = exp else {
         panic!("exp not identifier, got {exp:?}");
     };
 
-    assert_eq!(value, ident);
+    assert_eq!(value, ident.value);
     assert_eq!(value, exp.token_literal());
 }
 
@@ -1303,12 +1304,9 @@ fn test_let_statement(s: &Statement, expected: &str) {
         panic!("not let statement, got {s:?}");
     };
 
-    let Expression::Identifier { value, .. } = name else {
-        panic!("not identifier expression got {name:?}");
-    };
-    assert_eq!(expected, value);
+    assert_eq!(expected, name.value);
 
-    assert_eq!(expected, name.token_literal());
+    assert_eq!(expected, name.token.literal());
 }
 
 fn check_parse_errors(p: &Parser) {

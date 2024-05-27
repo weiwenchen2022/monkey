@@ -40,7 +40,7 @@ impl Display for Node {
 }
 
 impl Tokenizer for Node {
-    fn token_literal(&self) -> String {
+    fn token_literal(&self) -> &str {
         match self {
             Node::Program(program) => program.token_literal(),
             Node::Statement(statement) => statement.token_literal(),
@@ -51,7 +51,7 @@ impl Tokenizer for Node {
 
 // The base Node interface
 pub trait Tokenizer: Display {
-    fn token_literal(&self) -> String;
+    fn token_literal(&self) -> &str;
 }
 
 #[derive(Clone)]
@@ -60,11 +60,11 @@ pub struct Program {
 }
 
 impl Tokenizer for Program {
-    fn token_literal(&self) -> String {
+    fn token_literal(&self) -> &str {
         if let Some(first) = self.statements.first() {
             first.token_literal()
         } else {
-            "".to_string()
+            ""
         }
     }
 }
@@ -80,7 +80,7 @@ impl Display for Program {
 pub enum Statement {
     Let {
         token: Token, // the Token::Let token
-        name: Expression,
+        name: Identifier,
         value: Expression,
     },
 
@@ -94,19 +94,16 @@ pub enum Statement {
         expression: Expression,
     },
 
-    Block {
-        token: Token, // the { token
-        statements: Vec<Statement>,
-    },
+    Block(BlockStatement),
 }
 
 impl Tokenizer for Statement {
-    fn token_literal(&self) -> String {
+    fn token_literal(&self) -> &str {
         match self {
             Statement::Let { token, .. }
             | Statement::Return { token, .. }
             | Statement::Expression { token, .. }
-            | Statement::Block { token, .. } => format!("{}", token),
+            | Statement::Block(BlockStatement { token, .. }) => token.literal(),
         }
     }
 }
@@ -135,7 +132,7 @@ impl Display for Statement {
                 write!(f, "{}", expression)
             }
 
-            Statement::Block { statements, .. } => statements.iter().try_for_each(|s| s.fmt(f)),
+            Statement::Block(bs) => bs.fmt(f),
         }
     }
 }
@@ -143,10 +140,7 @@ impl Display for Statement {
 // Expressions
 #[derive(Clone, Debug)]
 pub enum Expression {
-    Identifier {
-        token: Token, // the Token::IDENT token
-        value: String,
-    },
+    Identifier(Identifier),
 
     Boolean {
         token: Token,
@@ -174,14 +168,14 @@ pub enum Expression {
     If {
         token: Token, // The 'if' token
         condition: Box<Expression>,
-        consequence: Box<Statement>,
-        alternative: Option<Box<Statement>>,
+        consequence: BlockStatement,
+        alternative: Option<BlockStatement>,
     },
 
     FunctionLiteral {
         token: Token, // The 'fn' token
-        parameters: Vec<Expression>,
-        body: Box<Statement>,
+        parameters: Vec<Identifier>,
+        body: BlockStatement,
         name: String,
     },
 
@@ -214,9 +208,33 @@ pub enum Expression {
 
     MacroLiteral {
         token: Token, // The 'macro' token
-        parameters: Vec<Expression>,
-        body: Box<Statement>,
+        parameters: Vec<Identifier>,
+        body: BlockStatement,
     },
+}
+
+#[derive(Debug, Clone)]
+pub struct BlockStatement {
+    pub(crate) token: Token, // the { token
+    pub(crate) statements: Vec<Statement>,
+}
+
+impl Display for BlockStatement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.statements.iter().try_for_each(|s| s.fmt(f))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Identifier {
+    pub(crate) token: Token, // the Token::IDENT token
+    pub(crate) value: String,
+}
+
+impl Display for Identifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.value.fmt(f)
+    }
 }
 
 impl PartialEq for Expression {
@@ -234,9 +252,9 @@ impl Hash for Expression {
 }
 
 impl Tokenizer for Expression {
-    fn token_literal(&self) -> String {
+    fn token_literal(&self) -> &str {
         match self {
-            Expression::Identifier { token, .. }
+            Expression::Identifier(Identifier { token, .. })
             | Expression::Boolean { token, .. }
             | Expression::IntegerLiteral { token, .. }
             | Expression::Prefix { token, .. }
@@ -248,7 +266,7 @@ impl Tokenizer for Expression {
             | Expression::ArrayLiteral { token, .. }
             | Expression::Index { token, .. }
             | Expression::HashLiteral { token, .. }
-            | Expression::MacroLiteral { token, .. } => format!("{}", token),
+            | Expression::MacroLiteral { token, .. } => token.literal(),
         }
     }
 }
@@ -256,7 +274,7 @@ impl Tokenizer for Expression {
 impl Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Expression::Identifier { value, .. } => value.fmt(f),
+            Expression::Identifier(Identifier { value, .. }) => value.fmt(f),
             Expression::Boolean { value, .. } => value.fmt(f),
             Expression::IntegerLiteral { value, .. } => value.fmt(f),
 

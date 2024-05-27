@@ -1,4 +1,4 @@
-use crate::ast::{Expression, Node, Statement};
+use crate::ast::{BlockStatement, Expression, Identifier, Node};
 use crate::code::Instructions;
 use crate::evaluator;
 
@@ -33,8 +33,8 @@ pub enum Object {
     Error(String),
 
     Function {
-        parameters: Vec<Expression>,
-        body: Statement,
+        parameters: Vec<Identifier>,
+        body: BlockStatement,
         env: Environment,
     },
 
@@ -47,8 +47,8 @@ pub enum Object {
 
     Quote(Node),
     Macro {
-        parameters: Vec<Expression>,
-        body: Statement,
+        parameters: Vec<Identifier>,
+        body: BlockStatement,
         env: Environment,
     },
 

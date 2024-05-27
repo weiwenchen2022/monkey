@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::Rc;
 
-use crate::ast::{Expression, Node, Program, Statement};
+use crate::ast::{BlockStatement, Expression, Identifier, Node, Program, Statement};
 use crate::error;
 use crate::object::{Environment, Object};
 
@@ -20,17 +20,14 @@ pub fn eval<N: Into<Node>>(node: N, env: &Environment) -> Result<Object> {
 
         // Statements
         Node::Statement(Statement::Expression { expression, .. }) => eval(expression, env),
-        Node::Statement(block @ Statement::Block { .. }) => eval_block_statement(block, env),
+        Node::Statement(Statement::Block(block)) => eval_block_statement(block, env),
         Node::Statement(Statement::Return { return_value, .. }) => {
             let val = eval(return_value, env)?;
             Ok(Object::ReturnValue(Box::new(val)))
         }
         Node::Statement(Statement::Let { name, value, .. }) => {
             let val = eval(value, env)?;
-            let Expression::Identifier { value: name, .. } = name else {
-                panic!("not identifier expression got {name:?}");
-            };
-            env.borrow_mut().set(name, val);
+            env.borrow_mut().set(name.value, val);
             Ok(Object::Null)
         }
 
@@ -63,21 +60,23 @@ pub fn eval<N: Into<Node>>(node: N, env: &Environment) -> Result<Object> {
         }) => {
             let condition = eval(*condition, env)?;
             if condition.into() {
-                eval(*consequence, env)
+                eval(Statement::Block(consequence), env)
             } else if let Some(alternative) = alternative {
-                eval(*alternative, env)
+                eval(Statement::Block(alternative), env)
             } else {
                 Ok(Object::Null)
             }
         }
 
-        Node::Expression(Expression::Identifier { value: name, .. }) => eval_identifier(&name, env),
+        Node::Expression(Expression::Identifier(Identifier { value: name, .. })) => {
+            eval_identifier(&name, env)
+        }
 
         Node::Expression(Expression::FunctionLiteral {
             parameters, body, ..
         }) => Ok(Object::Function {
             parameters,
-            body: *body,
+            body,
             env: Rc::clone(env),
         }),
         Node::Expression(Expression::Call {
@@ -129,22 +128,17 @@ fn eval_program(program: Program, env: &Environment) -> Result<Object> {
     Ok(result)
 }
 
-fn eval_block_statement(block: Statement, env: &Environment) -> Result<Object> {
-    match block {
-        Statement::Block { statements, .. } => {
-            let mut result = Object::Null;
+fn eval_block_statement(block: BlockStatement, env: &Environment) -> Result<Object> {
+    let mut result = Object::Null;
 
-            for statement in statements {
-                result = eval(statement, env)?;
-                if let Object::ReturnValue(_) = result {
-                    return Ok(result);
-                }
-            }
-
-            Ok(result)
+    for statement in block.statements {
+        result = eval(statement, env)?;
+        if let Object::ReturnValue(_) = result {
+            return Ok(result);
         }
-        _ => unreachable!("not block statement got {block:?}"),
     }
+
+    Ok(result)
 }
 
 fn eval_hash_literal(nodes: HashMap<Expression, Expression>, env: &Environment) -> Result<Object> {
@@ -207,7 +201,7 @@ fn apply_function(f: Object, args: Vec<Object>) -> Result<Object> {
             env,
         } => {
             let extend_env = extend_function_env(env, parameters, args);
-            let evaluated = eval(body, &extend_env)?;
+            let evaluated = eval(Statement::Block(body), &extend_env)?;
             unwrap_return_value(evaluated)
         }
 
@@ -219,17 +213,17 @@ fn apply_function(f: Object, args: Vec<Object>) -> Result<Object> {
 
 fn extend_function_env(
     env: Environment,
-    parameters: Vec<Expression>,
+    parameters: Vec<Identifier>,
     mut args: Vec<Object>,
 ) -> Environment {
     use crate::object::environment::_Environment;
     let mut env = _Environment::new(Some(env));
 
     for (param_idx, param) in parameters.into_iter().enumerate() {
-        let Expression::Identifier { value: name, .. } = param else {
-            panic!("not identifier expression got {:?}", param);
-        };
-        env.set(name, std::mem::replace(&mut args[param_idx], Object::Null));
+        env.set(
+            param.value,
+            std::mem::replace(&mut args[param_idx], Object::Null),
+        );
     }
 
     Rc::new(RefCell::new(env))

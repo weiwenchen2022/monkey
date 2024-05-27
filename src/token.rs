@@ -50,6 +50,96 @@ pub enum Token {
     Marco,    // macro
 }
 
+impl Token {
+    pub(crate) fn token_type(&self) -> &'static str {
+        match self {
+            Token::Eof => "Eof",
+
+            Token::Ident(_) => "Ident",
+            Token::Int(_) => "Int",
+            Token::String(_) => "String",
+            Token::LineComment(_) => "LineComment",
+
+            Token::Assign => "=",
+            Token::Plus => "+",
+            Token::Minus => "-",
+            Token::Bang => "!",
+            Token::Asterisk => "*",
+            Token::Slash => "/",
+            Token::LT => "<",
+            Token::GT => ">",
+            Token::EQ => "==",
+            Token::NotEq => "!=",
+
+            Token::Comma => ",",
+            Token::Semicolon => ";",
+            Token::Colon => ":",
+
+            Token::LParen => "(",
+            Token::RParen => ")",
+            Token::LBrace => "{",
+            Token::RBrace => "}",
+            Token::LBracket => "[",
+            Token::RBracket => "]",
+
+            Token::Function => "fn",
+            Token::Let => "let",
+            Token::True => "true",
+            Token::False => "false",
+            Token::IF => "if",
+            Token::Else => "else",
+            Token::Return => "return",
+            Token::Marco => "marco",
+
+            Token::Illegal(_) => "Illegal",
+        }
+    }
+
+    pub(crate) fn literal(&self) -> &str {
+        match self {
+            Token::Eof => "",
+
+            Token::Ident(literal)
+            | Token::Int(literal)
+            | Token::String(literal)
+            | Token::LineComment(literal) => literal,
+
+            Token::Assign => "=",
+            Token::Plus => "+",
+            Token::Minus => "-",
+            Token::Bang => "!",
+            Token::Asterisk => "*",
+            Token::Slash => "/",
+            Token::LT => "<",
+            Token::GT => ">",
+            Token::EQ => "==",
+            Token::NotEq => "!=",
+
+            Token::Comma => ",",
+            Token::Semicolon => ";",
+            Token::Colon => ":",
+
+            Token::LParen => "(",
+            Token::RParen => ")",
+            Token::LBrace => "{",
+            Token::RBrace => "}",
+            Token::LBracket => "[",
+            Token::RBracket => "]",
+
+            Token::Function => "fn",
+            Token::Let => "let",
+            Token::True => "true",
+            Token::False => "false",
+            Token::IF => "if",
+            Token::Else => "else",
+            Token::Return => "return",
+            Token::Marco => "marco",
+
+            Token::Illegal(s) => s,
+        }
+    }
+}
+
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

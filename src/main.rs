@@ -1,12 +1,12 @@
 use monkey::repl;
-use monkey::{self, Compiler, Lexer, VM};
+use monkey::{self, Compiler, Environment, Lexer, VM};
 use std::time::Instant;
 
 use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -14,9 +14,30 @@ struct Cli {
     /// scripts to executes
     scripts: Vec<PathBuf>,
 
+    /// What engine to run the program in
+    #[arg(short, long, default_value_t = Engine::VM)]
+    engine: Engine,
+
     /// enter interactive mode after executing 'scripts'
     #[arg(short, long)]
     interactive: bool,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum Engine {
+    VM,
+    Eval,
+}
+
+use std::fmt::{self, Display};
+
+impl Display for Engine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Engine::VM => write!(f, "vm"),
+            Engine::Eval => write!(f, "eval"),
+        }
+    }
 }
 
 fn main() {
@@ -35,25 +56,44 @@ fn main() {
         let mut p = monkey::Parser::new(l);
         let program = p.parse_program();
 
-        let mut comp = Compiler::new();
-        if let Err(err) = comp.compile(program) {
-            eprintln!("compiler error: {err}");
-            continue;
+        let result;
+        let duration;
+
+        match cli.engine {
+            Engine::VM => {
+                let mut comp = Compiler::new();
+                if let Err(err) = comp.compile(program) {
+                    eprintln!("compiler error: {err}");
+                    continue;
+                }
+
+                let mut machine = VM::new(comp.bytecode());
+
+                let start = Instant::now();
+                if let Err(err) = machine.run() {
+                    eprintln!("vm error: {err}");
+                    continue;
+                }
+
+                duration = start.elapsed();
+                result = machine.last_popped_stack_elem();
+            }
+            Engine::Eval => {
+                let env = Environment::default();
+                let start = Instant::now();
+                (result, duration) = match monkey::eval(program, &env) {
+                    Ok(result) => (result, start.elapsed()),
+                    Err(err) => {
+                        eprintln!("eval error: {err}");
+                        continue;
+                    }
+                };
+            }
         }
-
-        let mut machine = VM::new(comp.bytecode());
-
-        let start = Instant::now();
-        if let Err(err) = machine.run() {
-            eprintln!("vm error: {err}");
-            continue;
-        }
-
-        let duration = start.elapsed();
-        let result = machine.last_popped_stack_elem();
 
         println!(
-            "script={}, result={}, duration={:?}",
+            "engine={}, script={}, result={}, duration={:?}",
+            cli.engine,
             script.display(),
             result,
             duration
