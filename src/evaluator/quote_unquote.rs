@@ -29,7 +29,7 @@ fn eval_unquote_calls(node: Node, env: &Environment) -> Node {
         }
 
         let arg = arguments.pop().unwrap();
-        let unquoted = eval(arg, env).unwrap();
+        let unquoted = eval(&arg.into(), env).unwrap();
         unquoted.into()
     })
 }

@@ -70,7 +70,7 @@ fn main() {
         Engine::Eval => {
             let env = Environment::default();
             let start = Instant::now();
-            result = monkey::eval(program, &env).unwrap();
+            result = monkey::eval(&program.into(), &env).unwrap();
             duration = start.elapsed();
         }
     }

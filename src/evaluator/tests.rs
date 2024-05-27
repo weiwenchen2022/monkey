@@ -758,7 +758,7 @@ pub(crate) fn test_eval(input: &str) -> Object {
     let program = p.parse_program();
     let env = Environment::default();
 
-    eval(program, &env).unwrap_or_else(Object::Error)
+    eval(&program.into(), &env).unwrap_or_else(Object::Error)
 }
 
 fn test_integer_object(obj: &Object, expected: i64) {

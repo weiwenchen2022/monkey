@@ -81,7 +81,7 @@ fn main() {
             Engine::Eval => {
                 let env = Environment::default();
                 let start = Instant::now();
-                (result, duration) = match monkey::eval(program, &env) {
+                (result, duration) = match monkey::eval(&program.into(), &env) {
                     Ok(result) => (result, start.elapsed()),
                     Err(err) => {
                         eprintln!("eval error: {err}");

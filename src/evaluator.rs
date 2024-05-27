@@ -14,15 +14,15 @@ mod builtins;
 
 pub type Result<T> = std::result::Result<T, String>;
 
-pub fn eval<N: Into<Node>>(node: N, env: &Environment) -> Result<Object> {
-    match node.into() {
-        Node::Program(program) => eval_program(&program, env),
+pub fn eval(node: &Node, env: &Environment) -> Result<Object> {
+    match node {
+        Node::Program(program) => eval_program(program, env),
 
         // Statements
-        Node::Statement(stmt) => eval_statement(&stmt, env),
+        Node::Statement(stmt) => eval_statement(stmt, env),
 
         // Expressions
-        Node::Expression(exp) => eval_expression(&exp, env),
+        Node::Expression(exp) => eval_expression(exp, env),
     }
 }
 

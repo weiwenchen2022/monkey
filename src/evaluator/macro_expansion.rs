@@ -45,7 +45,7 @@ pub(crate) fn expand_macros(program: Program, env: &Environment) -> Node {
         let Object::Macro { body, .. } = obj else {
             panic!();
         };
-        let evaluated = eval(Statement::Block(body), &eval_env).unwrap();
+        let evaluated = eval(&Statement::Block(body).into(), &eval_env).unwrap();
 
         let Object::Quote(node) = evaluated else {
             panic!("we only support returning AST-nodes from macros");
