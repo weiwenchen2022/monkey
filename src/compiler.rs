@@ -1,3 +1,5 @@
+use num_traits::FromPrimitive;
+
 use crate::ast::{BlockStatement, Expression, Identifier, Node, Statement};
 use crate::code::{self, Instructions, Opcode};
 use crate::object::{self, Object};
@@ -373,7 +375,7 @@ impl Compiler {
     }
 
     fn change_operand(&mut self, op_pos: usize, operand: i64) {
-        let op = self.current_instructions()[op_pos].try_into().unwrap();
+        let op = Opcode::from_u8(self.current_instructions()[op_pos]).unwrap();
         let new_instruction = make!(op, operand);
         self.replace_instruction(op_pos, new_instruction.into());
     }

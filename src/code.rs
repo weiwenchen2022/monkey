@@ -1,4 +1,5 @@
 use lazy_static::lazy_static;
+use num_traits::FromPrimitive;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::{self, Debug, Display};
@@ -76,7 +77,9 @@ fn fmt_instruction<'a>(def: &'a Definition, operands: &[i64]) -> Cow<'a, str> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+use num_derive::{FromPrimitive, ToPrimitive};
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, FromPrimitive, ToPrimitive)]
 pub(crate) enum Opcode {
     Constant,
 
@@ -125,17 +128,17 @@ pub(crate) enum Opcode {
     CurrentClosure,
 }
 
-impl TryFrom<u8> for Opcode {
-    type Error = String;
-    fn try_from(op: u8) -> Result<Self, String> {
-        for key in DEFINITIONS.keys() {
-            if *key as u8 == op {
-                return Ok(*key);
-            }
-        }
-        Err(format!("opcode {op} undefined"))
-    }
-}
+// impl TryFrom<u8> for Opcode {
+//     type Error = String;
+//     fn try_from(op: u8) -> Result<Self, String> {
+//         for key in DEFINITIONS.keys() {
+//             if *key as u8 == op {
+//                 return Ok(*key);
+//             }
+//         }
+//         Err(format!("opcode {op} undefined"))
+//     }
+// }
 
 pub(crate) struct Definition {
     name: &'static str,
@@ -365,7 +368,7 @@ lazy_static! {
 
 pub fn lookup(op: u8) -> Result<&'static Definition, String> {
     DEFINITIONS
-        .get(&op.try_into()?)
+        .get(&Opcode::from_u8(op).ok_or_else(|| format!("opcode {op} undefined"))?)
         .ok_or_else(|| format!("opcode {op} undefined"))
 }
 

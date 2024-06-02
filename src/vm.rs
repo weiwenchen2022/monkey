@@ -1,3 +1,5 @@
+use num_traits::FromPrimitive;
+
 use crate::code::{self, Opcode};
 use crate::compiler::Bytecode;
 use crate::object::{self, Object};
@@ -108,7 +110,7 @@ impl VM {
 
             ip = self.current_frame().ip as usize;
             ins = self.current_frame().instructions();
-            op = ins[ip].try_into()?;
+            op = Opcode::from_u8(ins[ip]).unwrap();
 
             match op {
                 Opcode::Constant => {
