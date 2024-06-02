@@ -16,7 +16,10 @@ pub fn start<R: Read, W: Write>(input: R, mut output: W) -> Result<(), Box<dyn E
     let mut lines = BufReader::new(input).lines();
 
     let mut constants = Vec::new();
-    let mut globals = vec![Object::Null; vm::GLOBALS_SIZE];
+    let mut globals = {
+        let null = Rc::new(Object::Null);
+        vec![null; vm::GLOBALS_SIZE]
+    };
     let symbol_table = Rc::new(RefCell::new(SymbolTable::new(None)));
 
     for (i, v) in object::BUILTINS.iter().enumerate() {

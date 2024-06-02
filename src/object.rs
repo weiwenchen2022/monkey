@@ -55,7 +55,7 @@ pub enum Object {
     },
 
     Closure {
-        f: Box<Object>,
+        f: Rc<Object>,
         free: Vec<Object>,
     },
 }
@@ -163,6 +163,10 @@ impl Object {
             Object::Integer(_) | Object::String(_) | Object::Boolean(_)
         )
     }
+
+    pub fn is_truthy(&self) -> bool {
+        !matches!(self, Object::Null | Object::Boolean(false))
+    }
 }
 
 impl Display for Object {
@@ -233,7 +237,7 @@ impl From<Object> for bool {
 
 use std::ops::{Neg, Not};
 
-impl Not for Object {
+impl Not for &Object {
     type Output = evaluator::Result<Object>;
     fn not(self) -> Self::Output {
         match self {
@@ -244,7 +248,14 @@ impl Not for Object {
     }
 }
 
-impl Neg for Object {
+impl Not for Object {
+    type Output = evaluator::Result<Object>;
+    fn not(self) -> Self::Output {
+        <&Object as Not>::not(&self)
+    }
+}
+
+impl Neg for &Object {
     type Output = evaluator::Result<Object>;
     fn neg(self) -> Self::Output {
         match self {
@@ -254,9 +265,16 @@ impl Neg for Object {
     }
 }
 
+impl Neg for Object {
+    type Output = evaluator::Result<Object>;
+    fn neg(self) -> Self::Output {
+        <&Object as Neg>::neg(&self)
+    }
+}
+
 use std::ops::{Add, Div, Mul, Sub};
 
-impl Add for Object {
+impl Add for &Object {
     type Output = evaluator::Result<Object>;
     fn add(self, rhs: Self) -> Self::Output {
         match (&self, &rhs) {
@@ -274,7 +292,14 @@ impl Add for Object {
     }
 }
 
-impl Sub for Object {
+impl Add for Object {
+    type Output = evaluator::Result<Object>;
+    fn add(self, rhs: Self) -> Self::Output {
+        <&Object as Add>::add(&self, &rhs)
+    }
+}
+
+impl Sub for &Object {
     type Output = evaluator::Result<Object>;
     fn sub(self, rhs: Self) -> Self::Output {
         let (left_val, right_val) = match (&self, &rhs) {
@@ -285,7 +310,14 @@ impl Sub for Object {
     }
 }
 
-impl Mul for Object {
+impl Sub for Object {
+    type Output = evaluator::Result<Object>;
+    fn sub(self, rhs: Self) -> Self::Output {
+        <&Object as Sub>::sub(&self, &rhs)
+    }
+}
+
+impl Mul for &Object {
     type Output = evaluator::Result<Object>;
     fn mul(self, rhs: Self) -> Self::Output {
         let (left_val, right_val) = match (&self, &rhs) {
@@ -296,7 +328,14 @@ impl Mul for Object {
     }
 }
 
-impl Div for Object {
+impl Mul for Object {
+    type Output = evaluator::Result<Object>;
+    fn mul(self, rhs: Self) -> Self::Output {
+        <&Object as Mul>::mul(&self, &rhs)
+    }
+}
+
+impl Div for &Object {
     type Output = evaluator::Result<Object>;
     fn div(self, rhs: Self) -> Self::Output {
         let (left_val, right_val) = match (&self, &rhs) {
@@ -304,6 +343,13 @@ impl Div for Object {
             _ => return error!("unknown operator: {} / {}", self.ty(), rhs.ty()),
         };
         Ok(Object::Integer(left_val / right_val))
+    }
+}
+
+impl Div for Object {
+    type Output = evaluator::Result<Object>;
+    fn div(self, rhs: Self) -> Self::Output {
+        <&Object as Div>::div(&self, &rhs)
     }
 }
 

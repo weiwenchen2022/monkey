@@ -1,7 +1,7 @@
-use std::time::{Duration, Instant};
+use std::{rc::Rc, time::Instant};
 
 use clap::{Parser, ValueEnum};
-use monkey::{self, Compiler, Environment, Lexer, Object, VM};
+use monkey::{self, Compiler, Environment, Lexer, VM};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -47,8 +47,8 @@ fn main() {
     // 'TODO:'
     let cli = Cli::parse();
 
-    let duration: Duration;
-    let result: Object;
+    let duration;
+    let result;
 
     let l = Lexer::new(INPUT.as_bytes());
     let mut p = monkey::Parser::new(l);
@@ -70,7 +70,7 @@ fn main() {
         Engine::Eval => {
             let env = Environment::default();
             let start = Instant::now();
-            result = monkey::eval(&program.into(), &env).unwrap();
+            result = monkey::eval(&program.into(), &env).map(Rc::new).unwrap();
             duration = start.elapsed();
         }
     }

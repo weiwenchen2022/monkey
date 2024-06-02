@@ -51,6 +51,7 @@ pub enum Token {
 }
 
 impl Token {
+    #[allow(dead_code)]
     pub(crate) fn token_type(&self) -> &'static str {
         match self {
             Token::Eof => "Eof",

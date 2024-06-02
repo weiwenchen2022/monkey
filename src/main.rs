@@ -1,5 +1,6 @@
 use monkey::repl;
 use monkey::{self, Compiler, Environment, Lexer, VM};
+use std::rc::Rc;
 use std::time::Instant;
 
 use std::fs;
@@ -82,7 +83,7 @@ fn main() {
                 let env = Environment::default();
                 let start = Instant::now();
                 (result, duration) = match monkey::eval(&program.into(), &env) {
-                    Ok(result) => (result, start.elapsed()),
+                    Ok(result) => (Rc::new(result), start.elapsed()),
                     Err(err) => {
                         eprintln!("eval error: {err}");
                         continue;

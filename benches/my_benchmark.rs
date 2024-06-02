@@ -24,7 +24,7 @@ fn eval(input: &str) -> Object {
     let program = p.parse_program();
 
     let env = Environment::default();
-    monkey::eval(program, &env).unwrap()
+    monkey::eval(&program.into(), &env).unwrap()
 }
 
 fn eval_benchmark(c: &mut Criterion) {
@@ -43,7 +43,7 @@ fn vm(input: &str) -> Object {
     let mut machine = VM::new(comp.bytecode());
     machine.run().expect("vm error:");
 
-    machine.last_popped_stack_elem()
+    machine.last_popped_stack_elem().as_ref().clone()
 }
 
 fn vm_benchmark(c: &mut Criterion) {
