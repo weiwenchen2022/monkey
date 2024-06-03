@@ -987,11 +987,11 @@ fn test_constants(expected: &[Box<dyn Any>], actual: &[Object]) {
         } else if let Some(constant) = constant.downcast_ref::<&str>() {
             test_string_object(constant, &actual[i]);
         } else if let Some(constant) = constant.downcast_ref::<Vec<Instructions>>() {
-            let Object::CompiledFunction { instructions, .. } = &actual[i] else {
+            let Object::CompiledFunction(cf) = &actual[i] else {
                 panic!("constant %d - not a function: {}", &actual[i].ty())
             };
 
-            test_instructions(constant, instructions);
+            test_instructions(constant, &cf.instructions);
         } else {
             panic!("type_id {:?}", constant.as_ref().type_id());
         }

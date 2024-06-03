@@ -2,7 +2,7 @@ use num_traits::FromPrimitive;
 
 use crate::ast::{BlockStatement, Expression, Identifier, Node, Statement};
 use crate::code::{self, Instructions, Opcode};
-use crate::object::{self, Object};
+use crate::object::{self, CompiledFunction, Object};
 
 use std::cell::RefCell;
 use std::mem;
@@ -263,11 +263,11 @@ impl Compiler {
                     self.load_symbol(s);
                 }
 
-                let compiled_fn = Object::CompiledFunction {
+                let compiled_fn = Object::CompiledFunction(Rc::new(CompiledFunction {
                     instructions,
                     num_locals,
                     num_parameters,
-                };
+                }));
                 let fn_index = self.add_constant(compiled_fn);
                 self.emit(
                     Opcode::Closure,

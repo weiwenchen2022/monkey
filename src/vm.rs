@@ -2,7 +2,7 @@ use num_traits::FromPrimitive;
 
 use crate::code::{self, Opcode};
 use crate::compiler::Bytecode;
-use crate::object::{self, Object};
+use crate::object::{self, Closure, CompiledFunction, Object};
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -44,12 +44,12 @@ impl VM {
     }
 
     pub fn new(bytecode: Bytecode) -> Self {
-        let main_fn = Object::CompiledFunction {
+        let main_fn = CompiledFunction {
             instructions: bytecode.instructions,
             num_locals: 0,
             num_parameters: 0,
         };
-        let main_closure = Object::Closure {
+        let main_closure = Closure {
             f: Rc::new(main_fn),
             free: Vec::new(),
         };
@@ -258,16 +258,13 @@ impl VM {
                     self.current_frame().ip += 1;
 
                     let current_closure = &self.current_frame().cl;
-                    let Object::Closure { free, .. } = current_closure else {
-                        unreachable!();
-                    };
-                    let obj = free[free_index as usize].clone();
+                    let obj = current_closure.free[free_index as usize].clone();
                     self.push(Rc::new(obj))?;
                 }
 
                 Opcode::CurrentClosure => {
                     let current_closure = self.current_frame().cl.clone();
-                    self.push(Rc::new(current_closure))?;
+                    self.push(Rc::new(Object::Closure(current_closure)))?;
                 }
             }
         }
@@ -284,9 +281,9 @@ impl VM {
 
     fn push_closure(&mut self, const_index: usize, num_free: usize) -> Result<()> {
         let constant = &self.constants[const_index];
-        if !matches!(&**constant, Object::CompiledFunction { .. }) {
+        let Object::CompiledFunction(cf) = &**constant else {
             return Err(format!("not a function: {}", constant.ty()).into());
-        }
+        };
 
         let free = self.stack[self.sp - num_free..self.sp]
             .iter_mut()
@@ -298,10 +295,10 @@ impl VM {
             .collect();
         self.sp -= num_free;
 
-        let closure = Object::Closure {
-            f: Rc::clone(constant),
+        let closure = Object::Closure(Closure {
+            f: Rc::clone(cf),
             free,
-        };
+        });
         self.push(Rc::new(closure))
     }
 
@@ -315,18 +312,12 @@ impl VM {
     }
 
     fn call_closure(&mut self, cl: Object, num_args: usize) -> Result<()> {
-        let Object::Closure { f, .. } = &cl else {
+        let Object::Closure(cl) = cl else {
             return Err("calling non-function".into());
         };
 
-        let &Object::CompiledFunction {
-            num_locals,
-            num_parameters,
-            ..
-        } = f.as_ref()
-        else {
-            return Err("calling non-function".into());
-        };
+        let num_locals = cl.f.num_locals;
+        let num_parameters = cl.f.num_parameters;
 
         if num_parameters as usize != num_args {
             return Err(format!(

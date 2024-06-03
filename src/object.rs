@@ -48,16 +48,22 @@ pub enum Object {
         env: Environment,
     },
 
-    CompiledFunction {
-        instructions: Instructions,
-        num_locals: u8,
-        num_parameters: u8,
-    },
+    CompiledFunction(Rc<CompiledFunction>),
 
-    Closure {
-        f: Rc<Object>,
-        free: Vec<Object>,
-    },
+    Closure(Closure),
+}
+
+#[derive(Clone, Default)]
+pub struct Closure {
+    pub(crate) f: Rc<CompiledFunction>,
+    pub(crate) free: Vec<Object>,
+}
+
+#[derive(Default)]
+pub struct CompiledFunction {
+    pub(crate) instructions: Instructions,
+    pub(crate) num_locals: u8,
+    pub(crate) num_parameters: u8,
 }
 
 pub struct Function {

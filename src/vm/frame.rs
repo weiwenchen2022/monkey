@@ -1,8 +1,8 @@
-use crate::{code::Instructions, object::Object};
+use crate::{code::Instructions, object::Closure};
 
 #[derive(Clone)]
 pub(crate) struct Frame {
-    pub(crate) cl: Object,
+    pub(crate) cl: Closure,
     pub(crate) ip: isize,
     pub(crate) base_pointer: usize,
 }
@@ -10,7 +10,7 @@ pub(crate) struct Frame {
 impl Default for Frame {
     fn default() -> Self {
         Self {
-            cl: Object::Null,
+            cl: Closure::default(),
             ip: -1,
             base_pointer: 0,
         }
@@ -18,7 +18,7 @@ impl Default for Frame {
 }
 
 impl Frame {
-    pub(crate) fn new(cl: Object, base_pointer: usize) -> Self {
+    pub(crate) fn new(cl: Closure, base_pointer: usize) -> Self {
         Self {
             cl,
             ip: -1,
@@ -27,14 +27,6 @@ impl Frame {
     }
 
     pub(crate) fn instructions(&self) -> &Instructions {
-        if let Object::Closure { f, .. } = &self.cl {
-            if let Object::CompiledFunction { instructions, .. } = f.as_ref() {
-                instructions
-            } else {
-                unreachable!();
-            }
-        } else {
-            unreachable!();
-        }
+        &self.cl.f.instructions
     }
 }
