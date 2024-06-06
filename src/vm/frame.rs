@@ -1,8 +1,10 @@
+use std::rc::Rc;
+
 use crate::{code::Instructions, object::Closure};
 
 #[derive(Clone)]
 pub(crate) struct Frame {
-    pub(crate) cl: Closure,
+    pub(crate) cl: Rc<Closure>,
     pub(crate) ip: isize,
     pub(crate) base_pointer: usize,
 }
@@ -10,7 +12,7 @@ pub(crate) struct Frame {
 impl Default for Frame {
     fn default() -> Self {
         Self {
-            cl: Closure::default(),
+            cl: Rc::new(Closure::default()),
             ip: -1,
             base_pointer: 0,
         }
@@ -20,7 +22,7 @@ impl Default for Frame {
 impl Frame {
     pub(crate) fn new(cl: Closure, base_pointer: usize) -> Self {
         Self {
-            cl,
+            cl: Rc::new(cl),
             ip: -1,
             base_pointer,
         }

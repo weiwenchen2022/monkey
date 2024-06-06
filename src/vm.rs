@@ -258,12 +258,12 @@ impl VM {
                     self.current_frame().ip += 1;
 
                     let current_closure = &self.current_frame().cl;
-                    let obj = current_closure.free[free_index as usize].clone();
-                    self.push(Rc::new(obj))?;
+                    let obj = Rc::clone(&current_closure.free[free_index as usize]);
+                    self.push(obj)?;
                 }
 
                 Opcode::CurrentClosure => {
-                    let current_closure = self.current_frame().cl.clone();
+                    let current_closure = Rc::clone(&self.current_frame().cl);
                     self.push(Rc::new(Object::Closure(current_closure)))?;
                 }
             }
@@ -286,19 +286,15 @@ impl VM {
         };
 
         let free = self.stack[self.sp - num_free..self.sp]
-            .iter_mut()
-            .map(|obj| {
-                mem::replace(obj, Rc::clone(&self.null_obj))
-                    .as_ref()
-                    .clone()
-            })
+            .iter()
+            .map(Rc::clone)
             .collect();
         self.sp -= num_free;
 
-        let closure = Object::Closure(Closure {
+        let closure = Object::Closure(Rc::new(Closure {
             f: Rc::clone(cf),
             free,
-        });
+        }));
         self.push(Rc::new(closure))
     }
 
@@ -327,7 +323,7 @@ impl VM {
             .into());
         }
 
-        let frame = Frame::new(cl, self.sp - num_args);
+        let frame = Frame::new(cl.as_ref().clone(), self.sp - num_args);
         self.sp = frame.base_pointer + num_locals as usize;
         self.push_frame(frame);
 

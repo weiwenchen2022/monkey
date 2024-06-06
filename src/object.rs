@@ -50,13 +50,13 @@ pub enum Object {
 
     CompiledFunction(Rc<CompiledFunction>),
 
-    Closure(Closure),
+    Closure(Rc<Closure>),
 }
 
 #[derive(Clone, Default)]
 pub struct Closure {
     pub(crate) f: Rc<CompiledFunction>,
-    pub(crate) free: Vec<Object>,
+    pub(crate) free: Vec<Rc<Object>>,
 }
 
 #[derive(Default)]
