@@ -94,7 +94,7 @@ impl VM {
     #[allow(dead_code)]
     pub fn stack_top(&self) -> Rc<Object> {
         if 0 == self.sp {
-            Rc::clone(&self.null_obj)
+            self.null_obj()
         } else {
             Rc::clone(&self.stack[self.sp - 1])
         }
@@ -158,7 +158,7 @@ impl VM {
                 }
 
                 Opcode::Null => {
-                    self.push(Rc::clone(&self.null_obj))?;
+                    self.push(self.null_obj())?;
                 }
 
                 Opcode::SetGlobal => {
@@ -220,7 +220,7 @@ impl VM {
                     let frame = self.pop_frame();
                     self.sp = frame.base_pointer - 1;
 
-                    self.push(Rc::clone(&self.null_obj))?;
+                    self.push(self.null_obj())?;
                 }
 
                 Opcode::SetLocal => {
@@ -271,6 +271,10 @@ impl VM {
         Ok(())
     }
 
+    fn null_obj(&self) -> Rc<Object> {
+        Rc::clone(&self.null_obj)
+    }
+
     fn native_bool_to_boolean_object(&self, input: bool) -> Rc<Object> {
         if input {
             Rc::clone(&self.true_obj)
@@ -301,17 +305,13 @@ impl VM {
     fn execute_call(&mut self, num_args: usize) -> Result<()> {
         let callee = Rc::clone(&self.stack[self.sp - 1 - num_args]);
         match &*callee {
-            Object::Closure { .. } => self.call_closure(callee.as_ref().clone(), num_args),
+            Object::Closure(cl) => self.call_closure(cl, num_args),
             Object::Builtin(_) => self.call_builtin(&callee, num_args),
             _ => Err("calling non-closure and non-builtin".into()),
         }
     }
 
-    fn call_closure(&mut self, cl: Object, num_args: usize) -> Result<()> {
-        let Object::Closure(cl) = cl else {
-            return Err("calling non-function".into());
-        };
-
+    fn call_closure(&mut self, cl: &Closure, num_args: usize) -> Result<()> {
         let num_locals = cl.f.num_locals;
         let num_parameters = cl.f.num_parameters;
 
@@ -323,7 +323,7 @@ impl VM {
             .into());
         }
 
-        let frame = Frame::new(cl.as_ref().clone(), self.sp - num_args);
+        let frame = Frame::new(cl.clone(), self.sp - num_args);
         self.sp = frame.base_pointer + num_locals as usize;
         self.push_frame(frame);
 
@@ -332,12 +332,8 @@ impl VM {
 
     fn call_builtin(&mut self, builtin: &Object, num_args: usize) -> Result<()> {
         let args = self.stack[self.sp - num_args..self.sp]
-            .iter_mut()
-            .map(|arg| {
-                mem::replace(arg, Rc::clone(&self.null_obj))
-                    .as_ref()
-                    .clone()
-            })
+            .iter()
+            .map(|arg| arg.as_ref().clone())
             .collect();
 
         let Object::Builtin(f) = builtin else {
@@ -369,7 +365,7 @@ impl VM {
                 .get(i as usize)
                 .cloned()
                 .map(Rc::new)
-                .unwrap_or_else(|| Rc::clone(&self.null_obj)),
+                .unwrap_or_else(|| self.null_obj()),
         )
     }
 
@@ -387,7 +383,7 @@ impl VM {
                 .get(&index)
                 .cloned()
                 .map(Rc::new)
-                .unwrap_or_else(|| Rc::clone(&self.null_obj)),
+                .unwrap_or_else(|| self.null_obj()),
         )
     }
 
@@ -395,12 +391,8 @@ impl VM {
         let mut hashed = HashMap::with_capacity((end_index - start_index) / 2);
 
         for i in (start_index..end_index).step_by(2) {
-            let key = mem::replace(&mut self.stack[i], Rc::clone(&self.null_obj))
-                .as_ref()
-                .clone();
-            let value = mem::replace(&mut self.stack[i + 1], Rc::clone(&self.null_obj))
-                .as_ref()
-                .clone();
+            let key = self.stack[i].as_ref().clone();
+            let value = self.stack[i + 1].as_ref().clone();
 
             if !key.is_hashable() {
                 return Err(format!("unusable as hash key: {}", key.ty()).into());
@@ -414,12 +406,8 @@ impl VM {
 
     fn build_array(&mut self, start_index: usize, end_index: usize) -> Object {
         let elements = self.stack[start_index..end_index]
-            .iter_mut()
-            .map(|elem| {
-                mem::replace(elem, Rc::clone(&self.null_obj))
-                    .as_ref()
-                    .clone()
-            })
+            .iter()
+            .map(|elem| elem.as_ref().clone())
             .collect::<Vec<_>>();
 
         Object::Array(elements.into())
@@ -444,10 +432,10 @@ impl VM {
 
         match (&*left, &*right) {
             (Object::Integer(_), Object::Integer(_)) => {
-                self.execute_binary_integer_operation(op, left, right)
+                self.execute_binary_integer_operation(op, &left, &right)
             }
             (Object::String(_), Object::String(_)) => {
-                self.execute_binary_string_operation(op, left, right)
+                self.execute_binary_string_operation(op, &left, &right)
             }
 
             _ => Err(format!(
@@ -462,30 +450,30 @@ impl VM {
     fn execute_binary_integer_operation(
         &mut self,
         op: Opcode,
-        left: Rc<Object>,
-        right: Rc<Object>,
+        left: &Object,
+        right: &Object,
     ) -> Result<()> {
         let result = match op {
-            Opcode::Add => &*left + &*right,
-            Opcode::Sub => &*left - &*right,
-            Opcode::Mul => &*left * &*right,
-            Opcode::Div => &*left / &*right,
+            Opcode::Add => left + right,
+            Opcode::Sub => left - right,
+            Opcode::Mul => left * right,
+            Opcode::Div => left / right,
             _ => Err(format!("unknown integer operator: {op:?}")),
-        };
-        self.push(Rc::new(result?))
+        }?;
+        self.push(Rc::new(result))
     }
 
     fn execute_binary_string_operation(
         &mut self,
         op: Opcode,
-        left: Rc<Object>,
-        right: Rc<Object>,
+        left: &Object,
+        right: &Object,
     ) -> Result<()> {
         let result = match op {
-            Opcode::Add => &*left + &*right,
+            Opcode::Add => left + right,
             _ => Err(format!("unknown string operator: {op:?}")),
-        };
-        self.push(Rc::new(result?))
+        }?;
+        self.push(Rc::new(result))
     }
 
     fn execute_comparison(&mut self, op: Opcode) -> Result<()> {
@@ -493,8 +481,12 @@ impl VM {
         let left = self.pop();
 
         match op {
-            Opcode::Equal => self.push(self.native_bool_to_boolean_object(left == right)),
-            Opcode::NotEqual => self.push(self.native_bool_to_boolean_object(left != right)),
+            Opcode::Equal => self.push(
+                self.native_bool_to_boolean_object(Rc::ptr_eq(&left, &right) || *left == *right),
+            ),
+            Opcode::NotEqual => self.push(
+                self.native_bool_to_boolean_object(!Rc::ptr_eq(&left, &right) && *left != *right),
+            ),
             Opcode::GreaterThan => {
                 if let Some(ord) = left.partial_cmp(&right) {
                     self.push(self.native_bool_to_boolean_object(matches!(ord, Ordering::Greater)))
